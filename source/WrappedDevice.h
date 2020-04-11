@@ -16,7 +16,7 @@ using namespace Microsoft::WRL;
 // We implement ID3D11Device and ID3D11DeviceContext together with their corresponding DXGI interfaces,
 // and any additional data which has to be stored in D3D11 resources gets included as their private data.
 // This allows us to avoid wrapping them, while still allowing to associate additional data with them.
-class D3D11Device final : public RuntimeClass<RuntimeClassFlags<ClassicCom>, ID3D11Device> // TODO: Proper inheritance, test this!
+class D3D11Device final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ID3D11Device, ChainInterfaces<IDXGIDevice1, IDXGIDevice, IDXGIObject> >
 {
 public:
     D3D11Device( wil::unique_hmodule module, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> immediateContext );
@@ -24,6 +24,7 @@ public:
     // Overload to release immediate device context explicitly
     virtual ULONG STDMETHODCALLTYPE Release() override;
 
+    // ID3D11Device
     virtual HRESULT STDMETHODCALLTYPE CreateBuffer(const D3D11_BUFFER_DESC* pDesc, const D3D11_SUBRESOURCE_DATA* pInitialData, ID3D11Buffer** ppBuffer) override;
     virtual HRESULT STDMETHODCALLTYPE CreateTexture1D(const D3D11_TEXTURE1D_DESC* pDesc, const D3D11_SUBRESOURCE_DATA* pInitialData, ID3D11Texture1D** ppTexture1D) override;
     virtual HRESULT STDMETHODCALLTYPE CreateTexture2D(const D3D11_TEXTURE2D_DESC* pDesc, const D3D11_SUBRESOURCE_DATA* pInitialData, ID3D11Texture2D** ppTexture2D) override;
@@ -65,16 +66,27 @@ public:
     virtual HRESULT STDMETHODCALLTYPE SetExceptionMode(UINT RaiseFlags) override;
     virtual UINT STDMETHODCALLTYPE GetExceptionMode(void) override;
 
+    // IDXGIDevice1
+    virtual HRESULT STDMETHODCALLTYPE GetParent(REFIID riid, void** ppParent) override;
+    virtual HRESULT STDMETHODCALLTYPE GetAdapter(IDXGIAdapter** pAdapter) override;
+    virtual HRESULT STDMETHODCALLTYPE CreateSurface(const DXGI_SURFACE_DESC* pDesc, UINT NumSurfaces, DXGI_USAGE Usage, const DXGI_SHARED_RESOURCE* pSharedResource, IDXGISurface** ppSurface) override;
+    virtual HRESULT STDMETHODCALLTYPE QueryResourceResidency(IUnknown* const* ppResources, DXGI_RESIDENCY* pResidencyStatus, UINT NumResources) override;
+    virtual HRESULT STDMETHODCALLTYPE SetGPUThreadPriority(INT Priority) override;
+    virtual HRESULT STDMETHODCALLTYPE GetGPUThreadPriority(INT* pPriority) override;
+    virtual HRESULT STDMETHODCALLTYPE SetMaximumFrameLatency(UINT MaxLatency) override;
+    virtual HRESULT STDMETHODCALLTYPE GetMaximumFrameLatency(UINT* pMaxLatency) override;
+
 private:
     wil::unique_hmodule m_d3dModule;
     ComPtr<ID3D11Device> m_orig;
+    ComPtr<IDXGIDevice1> m_origDxgi;
 
     // NOTE: We cannot use WRL::ComPtr here, as we call Release on this context manually
     // when D3D11Device's reference count has reached 1 (as in, only immediate context references it)
     class D3D11DeviceContext* m_immediateContext = nullptr;
 };
 
-class D3D11DeviceContext final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<ID3D11DeviceContext, ID3D11DeviceChild> > // TODO: Proper inheritance, test this!
+class D3D11DeviceContext final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<ID3D11DeviceContext, ID3D11DeviceChild> >
 {
 public:
     D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device);

@@ -42,6 +42,8 @@ HRESULT WINAPI D3D11CreateDevice_Export( IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE
 D3D11Device::D3D11Device(wil::unique_hmodule module, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> immediateContext)
     : m_d3dModule( std::move(module) ), m_orig( std::move(device) )
 {
+    m_orig.As(&m_origDxgi);
+
     ComPtr<D3D11DeviceContext> context = Make<D3D11DeviceContext>( std::move(immediateContext), this );
     m_immediateContext = context.Detach();
 }
@@ -262,6 +264,46 @@ HRESULT STDMETHODCALLTYPE D3D11Device::SetExceptionMode(UINT RaiseFlags)
 UINT STDMETHODCALLTYPE D3D11Device::GetExceptionMode(void)
 {
     return m_orig->GetExceptionMode();
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::GetParent(REFIID riid, void** ppParent)
+{
+    return m_origDxgi->GetParent(riid, ppParent);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::GetAdapter(IDXGIAdapter** pAdapter)
+{
+    return m_origDxgi->GetAdapter(pAdapter);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::CreateSurface(const DXGI_SURFACE_DESC* pDesc, UINT NumSurfaces, DXGI_USAGE Usage, const DXGI_SHARED_RESOURCE* pSharedResource, IDXGISurface** ppSurface)
+{
+    return m_origDxgi->CreateSurface(pDesc, NumSurfaces, Usage, pSharedResource, ppSurface);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::QueryResourceResidency(IUnknown* const* ppResources, DXGI_RESIDENCY* pResidencyStatus, UINT NumResources)
+{
+    return m_origDxgi->QueryResourceResidency(ppResources, pResidencyStatus, NumResources);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::SetGPUThreadPriority(INT Priority)
+{
+    return m_origDxgi->SetGPUThreadPriority(Priority);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::GetGPUThreadPriority(INT* pPriority)
+{
+    return m_origDxgi->GetGPUThreadPriority(pPriority);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::SetMaximumFrameLatency(UINT MaxLatency)
+{
+    return m_origDxgi->SetMaximumFrameLatency(MaxLatency);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::GetMaximumFrameLatency(UINT* pMaxLatency)
+{
+    return m_origDxgi->GetMaximumFrameLatency(pMaxLatency);
 }
 
 // ====================================================
