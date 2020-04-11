@@ -21,8 +21,8 @@ class D3D11Device final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ID
 public:
     D3D11Device( wil::unique_hmodule module, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> immediateContext );
 
-    // Overload to release immediate device context explicitly
-    virtual ULONG STDMETHODCALLTYPE Release() override;
+    virtual ULONG STDMETHODCALLTYPE Release() override; // Overload to release immediate device context explicitly
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override; // Overload to allow DXGI to query for internal, undocumented interfaces
 
     // ID3D11Device
     virtual HRESULT STDMETHODCALLTYPE CreateBuffer(const D3D11_BUFFER_DESC* pDesc, const D3D11_SUBRESOURCE_DATA* pInitialData, ID3D11Buffer** ppBuffer) override;
@@ -90,6 +90,8 @@ class D3D11DeviceContext final : public RuntimeClass< RuntimeClassFlags<ClassicC
 {
 public:
     D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device);
+
+    virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override; // Overload to allow DXGI to query for internal, undocumented interfaces
 
     virtual void STDMETHODCALLTYPE GetDevice(ID3D11Device** ppDevice) override;
     virtual HRESULT STDMETHODCALLTYPE GetPrivateData(REFGUID guid, UINT* pDataSize, void* pData) override;

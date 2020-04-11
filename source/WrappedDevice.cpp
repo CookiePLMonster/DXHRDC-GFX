@@ -58,6 +58,16 @@ ULONG STDMETHODCALLTYPE D3D11Device::Release()
     return ref;
 }
 
+HRESULT STDMETHODCALLTYPE D3D11Device::QueryInterface(REFIID riid, void** ppvObject)
+{
+    HRESULT hr = __super::QueryInterface(riid, ppvObject);
+    if ( FAILED(hr) )
+    {
+        hr = m_orig->QueryInterface(riid, ppvObject);
+    }
+    return hr;
+}
+
 HRESULT STDMETHODCALLTYPE D3D11Device::CreateBuffer(const D3D11_BUFFER_DESC* pDesc, const D3D11_SUBRESOURCE_DATA* pInitialData, ID3D11Buffer** ppBuffer)
 {
     return m_orig->CreateBuffer(pDesc, pInitialData, ppBuffer);
@@ -311,6 +321,16 @@ HRESULT STDMETHODCALLTYPE D3D11Device::GetMaximumFrameLatency(UINT* pMaxLatency)
 inline D3D11DeviceContext::D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device)
     : m_device(std::move(device)), m_orig(std::move(context))
 {
+}
+
+HRESULT STDMETHODCALLTYPE D3D11DeviceContext::QueryInterface(REFIID riid, void** ppvObject)
+{
+    HRESULT hr = __super::QueryInterface(riid, ppvObject);
+    if ( FAILED(hr) )
+    {
+        hr = m_orig->QueryInterface(riid, ppvObject);
+    }
+    return hr;
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::GetDevice(ID3D11Device** ppDevice)
