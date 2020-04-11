@@ -19,7 +19,10 @@ workspace "*"
 			["Resources"] = "source/**.rc"
 	}
 
-	files { "source/*.h", "source/*.cpp", "source/resources/*.rc" }
+	files { "source/*.h", "source/*.cpp", "source/resources/*.rc", "source/wil/*" }
+
+	-- Disable exceptions in WIL
+	defines { "WIL_SUPPRESS_EXCEPTIONS" }
 
 	cppdialect "C++17"
 	staticruntime "on"
