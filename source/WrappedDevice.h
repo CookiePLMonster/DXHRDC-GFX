@@ -5,8 +5,12 @@
 #include <wrl/implements.h>
 #include <wrl/client.h>
 #include "wil/resource.h"
+#include <memory>
 
 #include "WrappedExtension.h"
+
+// Effects
+#include "effects/ColorGrading.h"
 
 using namespace Microsoft::WRL;
 
@@ -80,6 +84,10 @@ public:
 
     // IWrapperObject
     virtual HRESULT STDMETHODCALLTYPE GetUnderlyingInterface(REFIID riid, void** ppvObject) override;
+
+    // DXHR effects
+    // Must be private so device context can access those
+    std::unique_ptr<Effects::ColorGrading> m_colorGrading;
 
 private:
     wil::unique_hmodule m_d3dModule;

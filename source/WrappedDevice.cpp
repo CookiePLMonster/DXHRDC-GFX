@@ -40,7 +40,8 @@ HRESULT WINAPI D3D11CreateDevice_Export( IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE
 // ====================================================
 
 D3D11Device::D3D11Device(wil::unique_hmodule module, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> immediateContext)
-    : m_d3dModule( std::move(module) ), m_orig( std::move(device) )
+    : m_d3dModule( std::move(module) ), m_orig( std::move(device) ),
+      m_colorGrading( std::make_unique<Effects::ColorGrading>(this) )
 {
     m_orig.As(&m_origDxgi);
 
@@ -131,7 +132,12 @@ HRESULT STDMETHODCALLTYPE D3D11Device::CreateGeometryShaderWithStreamOutput(cons
 
 HRESULT STDMETHODCALLTYPE D3D11Device::CreatePixelShader(const void* pShaderBytecode, SIZE_T BytecodeLength, ID3D11ClassLinkage* pClassLinkage, ID3D11PixelShader** ppPixelShader)
 {
-    return m_orig->CreatePixelShader(pShaderBytecode, BytecodeLength, pClassLinkage, ppPixelShader);
+    HRESULT hr = m_orig->CreatePixelShader(pShaderBytecode, BytecodeLength, pClassLinkage, ppPixelShader);
+    if ( SUCCEEDED(hr) )
+    {
+        m_colorGrading->AnnotatePixelShader( *ppPixelShader, pShaderBytecode, BytecodeLength );
+    }
+    return hr;
 }
 
 HRESULT STDMETHODCALLTYPE D3D11Device::CreateHullShader(const void* pShaderBytecode, SIZE_T BytecodeLength, ID3D11ClassLinkage* pClassLinkage, ID3D11HullShader** ppHullShader)
@@ -371,7 +377,8 @@ void STDMETHODCALLTYPE D3D11DeviceContext::PSSetShaderResources(UINT StartSlot, 
 
 void STDMETHODCALLTYPE D3D11DeviceContext::PSSetShader(ID3D11PixelShader* pPixelShader, ID3D11ClassInstance* const* ppClassInstances, UINT NumClassInstances)
 {
-	m_orig->PSSetShader(pPixelShader, ppClassInstances, NumClassInstances);
+    m_orig->PSSetShader(pPixelShader, ppClassInstances, NumClassInstances);
+    m_device->m_colorGrading->OnPixelShaderSet(pPixelShader);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::PSSetSamplers(UINT StartSlot, UINT NumSamplers, ID3D11SamplerState* const* ppSamplers)
@@ -386,12 +393,14 @@ void STDMETHODCALLTYPE D3D11DeviceContext::VSSetShader(ID3D11VertexShader* pVert
 
 void STDMETHODCALLTYPE D3D11DeviceContext::DrawIndexed(UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
 {
-	m_orig->DrawIndexed(IndexCount, StartIndexLocation, BaseVertexLocation);
+    m_device->m_colorGrading->BeforeDrawIndexed(this);
+    m_orig->DrawIndexed(IndexCount, StartIndexLocation, BaseVertexLocation);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::Draw(UINT VertexCount, UINT StartVertexLocation)
 {
-	m_orig->Draw(VertexCount, StartVertexLocation);
+    m_device->m_colorGrading->BeforeDraw(this);
+    m_orig->Draw(VertexCount, StartVertexLocation);
 }
 
 HRESULT STDMETHODCALLTYPE D3D11DeviceContext::Map(ID3D11Resource* pResource, UINT Subresource, D3D11_MAP MapType, UINT MapFlags, D3D11_MAPPED_SUBRESOURCE* pMappedResource)
@@ -421,7 +430,8 @@ void STDMETHODCALLTYPE D3D11DeviceContext::IASetVertexBuffers(UINT StartSlot, UI
 
 void STDMETHODCALLTYPE D3D11DeviceContext::IASetIndexBuffer(ID3D11Buffer* pIndexBuffer, DXGI_FORMAT Format, UINT Offset)
 {
-	m_orig->IASetIndexBuffer(pIndexBuffer, Format, Offset);
+    m_device->m_colorGrading->BeforeSetIndexBuffer(this);
+    m_orig->IASetIndexBuffer(pIndexBuffer, Format, Offset);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::DrawIndexedInstanced(UINT IndexCountPerInstance, UINT InstanceCount, UINT StartIndexLocation, INT BaseVertexLocation, UINT StartInstanceLocation)

@@ -19,7 +19,8 @@ workspace "*"
 			["Resources"] = "source/**.rc"
 	}
 
-	files { "source/*.h", "source/*.cpp", "source/resources/*.rc", "source/wil/*", "source/*.def" }
+	files { "source/*.h", "source/*.cpp", "source/resources/*.rc", "source/wil/*", "source/*.def",
+ 			"source/effects/*" }
 
 	-- Disable exceptions in WIL
 	defines { "WIL_SUPPRESS_EXCEPTIONS" }
