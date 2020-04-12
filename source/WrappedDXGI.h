@@ -6,13 +6,15 @@
 #include <wrl/client.h>
 #include "wil/resource.h"
 
+#include "WrappedExtension.h"
+
 using namespace Microsoft::WRL;
 
 
 // Wrapped DXGI interfaces which are mostly passthrough, but they are also
 // aware of our D3D11 wrappers
 
-class DXGIFactory final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<IDXGIFactory, IDXGIObject> >
+class DXGIFactory final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<IDXGIFactory, IDXGIObject>, IWrapperObject >
 {
 public:
 	DXGIFactory( wil::unique_hmodule module, ComPtr<IDXGIFactory> factory );
@@ -29,6 +31,9 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE GetWindowAssociation(HWND* pWindowHandle) override;
 	virtual HRESULT STDMETHODCALLTYPE CreateSwapChain(IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain) override;
 	virtual HRESULT STDMETHODCALLTYPE CreateSoftwareAdapter(HMODULE Module, IDXGIAdapter** ppAdapter) override;
+
+	// IWrapperObject
+	virtual HRESULT STDMETHODCALLTYPE GetUnderlyingInterface(REFIID riid, void** ppvObject) override;
 
 private:
 	wil::unique_hmodule m_dxgiModule;

@@ -82,10 +82,27 @@ HRESULT STDMETHODCALLTYPE DXGIFactory::GetWindowAssociation(HWND* pWindowHandle)
 
 HRESULT STDMETHODCALLTYPE DXGIFactory::CreateSwapChain(IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
 {
+    if ( pDevice == nullptr ) return DXGI_ERROR_INVALID_CALL;
+
+    ComPtr<IWrapperObject> wrapper;
+    if ( SUCCEEDED(pDevice->QueryInterface(IID_PPV_ARGS(wrapper.GetAddressOf()))) )
+    {
+        ComPtr<IUnknown> underlyingInterface;
+        if ( SUCCEEDED(wrapper->GetUnderlyingInterface(IID_PPV_ARGS(underlyingInterface.GetAddressOf()))) )
+        {
+            return m_orig->CreateSwapChain(underlyingInterface.Get(), pDesc, ppSwapChain);
+        }
+    }
+
     return m_orig->CreateSwapChain(pDevice, pDesc, ppSwapChain);
 }
 
 HRESULT STDMETHODCALLTYPE DXGIFactory::CreateSoftwareAdapter(HMODULE Module, IDXGIAdapter** ppAdapter)
 {
     return m_orig->CreateSoftwareAdapter(Module, ppAdapter);
+}
+
+HRESULT STDMETHODCALLTYPE DXGIFactory::GetUnderlyingInterface(REFIID riid, void** ppvObject)
+{
+    return m_orig.CopyTo(riid, ppvObject);
 }

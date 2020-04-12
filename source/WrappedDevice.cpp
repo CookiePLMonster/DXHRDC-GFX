@@ -54,6 +54,7 @@ ULONG STDMETHODCALLTYPE D3D11Device::Release()
     if ( ref == 1 ) // Immediate context holds a reference to this object too
     {
         m_immediateContext->Release();
+        return 0; // Above call decrements our reference count, reflect this in the return value
     }
     return ref;
 }
@@ -314,6 +315,11 @@ HRESULT STDMETHODCALLTYPE D3D11Device::SetMaximumFrameLatency(UINT MaxLatency)
 HRESULT STDMETHODCALLTYPE D3D11Device::GetMaximumFrameLatency(UINT* pMaxLatency)
 {
     return m_origDxgi->GetMaximumFrameLatency(pMaxLatency);
+}
+
+HRESULT STDMETHODCALLTYPE D3D11Device::GetUnderlyingInterface(REFIID riid, void** ppvObject)
+{
+    return m_orig.CopyTo(riid, ppvObject);
 }
 
 // ====================================================

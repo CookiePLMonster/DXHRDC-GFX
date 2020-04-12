@@ -6,6 +6,8 @@
 #include <wrl/client.h>
 #include "wil/resource.h"
 
+#include "WrappedExtension.h"
+
 using namespace Microsoft::WRL;
 
 
@@ -16,7 +18,7 @@ using namespace Microsoft::WRL;
 // We implement ID3D11Device and ID3D11DeviceContext together with their corresponding DXGI interfaces,
 // and any additional data which has to be stored in D3D11 resources gets included as their private data.
 // This allows us to avoid wrapping them, while still allowing to associate additional data with them.
-class D3D11Device final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ID3D11Device, ChainInterfaces<IDXGIDevice1, IDXGIDevice, IDXGIObject> >
+class D3D11Device final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ID3D11Device, ChainInterfaces<IDXGIDevice1, IDXGIDevice, IDXGIObject>, IWrapperObject >
 {
 public:
     D3D11Device( wil::unique_hmodule module, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> immediateContext );
@@ -75,6 +77,9 @@ public:
     virtual HRESULT STDMETHODCALLTYPE GetGPUThreadPriority(INT* pPriority) override;
     virtual HRESULT STDMETHODCALLTYPE SetMaximumFrameLatency(UINT MaxLatency) override;
     virtual HRESULT STDMETHODCALLTYPE GetMaximumFrameLatency(UINT* pMaxLatency) override;
+
+    // IWrapperObject
+    virtual HRESULT STDMETHODCALLTYPE GetUnderlyingInterface(REFIID riid, void** ppvObject) override;
 
 private:
     wil::unique_hmodule m_d3dModule;
