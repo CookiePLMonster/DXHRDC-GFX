@@ -469,87 +469,97 @@ void Effects::ColorGrading::BeforeDrawIndexed( ID3D11DeviceContext* context )
 	
 }
 
-void Effects::ColorGrading::BeforeSetIndexBuffer(ID3D11DeviceContext* context)
+void Effects::ColorGrading::BeforeOMSetBlendState( ID3D11DeviceContext* context, ID3D11BlendState* pBlendState )
 {
-	if ( std::exchange(m_state, State::Initial) == State::ResourcesGathered )
+	if ( blendState != nullptr )
 	{
-		// TODO: Cache those! Later on we'll be creating a render target to render color grading to
-		// and it'll have to be cached
+		// If setting to a different blend state to what we saved, draw
+		ComPtr<IUnknown> lhs, rhs;
+		blendState.As(&lhs);
+		pBlendState->QueryInterface(IID_PPV_ARGS(&rhs));
+		if ( lhs != rhs )
+		{
+			blendState.Reset();
 
-		ComPtr<ID3D11RenderTargetView> rtv;
-		context->OMGetRenderTargets( 1, rtv.GetAddressOf(), nullptr );
+			if ( std::exchange(m_state, State::Initial) == State::ResourcesGathered )
+			{
+				// TODO: Cache those! Later on we'll be creating a render target to render color grading to
+				// and it'll have to be cached
 
-		ComPtr<ID3D11Resource> rt;
-		rtv->GetResource( rt.GetAddressOf() );
+				ComPtr<ID3D11RenderTargetView> rtv;
+				context->OMGetRenderTargets( 1, rtv.GetAddressOf(), nullptr );
 
-		ComPtr<ID3D11Texture2D> rtex2d;
-		rt.As(&rtex2d);
+				ComPtr<ID3D11Resource> rt;
+				rtv->GetResource( rt.GetAddressOf() );
 
-		D3D11_TEXTURE2D_DESC desc;
-		rtex2d->GetDesc( &desc );
+				ComPtr<ID3D11Texture2D> rtex2d;
+				rt.As(&rtex2d);
 
-		ComPtr<ID3D11Texture2D> newRt;
-		m_device->CreateTexture2D( &desc, nullptr, newRt.GetAddressOf() );
+				D3D11_TEXTURE2D_DESC desc;
+				rtex2d->GetDesc( &desc );
 
-		ComPtr<ID3D11RenderTargetView> newRtv;
-		m_device->CreateRenderTargetView( newRt.Get(), nullptr, newRtv.GetAddressOf() );
+				ComPtr<ID3D11Texture2D> newRt;
+				m_device->CreateTexture2D( &desc, nullptr, newRt.GetAddressOf() );
+
+				ComPtr<ID3D11RenderTargetView> newRtv;
+				m_device->CreateRenderTargetView( newRt.Get(), nullptr, newRtv.GetAddressOf() );
 
 		
-		ComPtr<ID3D11ShaderResourceView> srv;
-		m_device->CreateShaderResourceView( rt.Get(), nullptr, srv.GetAddressOf() );
+				ComPtr<ID3D11ShaderResourceView> srv;
+				m_device->CreateShaderResourceView( rt.Get(), nullptr, srv.GetAddressOf() );
 
-		// Now set up the color grading call - we save and restore states wherever possible
-		ComPtr<ID3D11VertexShader> savedVertexShader; // TODO: Should factorize those into functions
-		ComPtr<ID3D11PixelShader> savedPixelShader;
-		ComPtr<ID3D11InputLayout> savedInputLayout;
-		ComPtr<ID3D11RasterizerState> savedRasterizerState;
-		ComPtr<ID3D11RenderTargetView> savedRTV;
+				// Now set up the color grading call - we save and restore states wherever possible
+				ComPtr<ID3D11VertexShader> savedVertexShader; // TODO: Should factorize those into functions
+				ComPtr<ID3D11PixelShader> savedPixelShader;
+				ComPtr<ID3D11InputLayout> savedInputLayout;
+				ComPtr<ID3D11RasterizerState> savedRasterizerState;
+				ComPtr<ID3D11RenderTargetView> savedRTV;
+				ComPtr<ID3D11ShaderResourceView> savedSRV;
 
-		ComPtr<ID3D11Buffer> savedInputBuffer;
-		UINT Stride;
-		UINT Offset;
+				ComPtr<ID3D11Buffer> savedInputBuffer;
+				UINT Stride;
+				UINT Offset;
 
-		ComPtr<ID3D11Buffer> savedConstantBuffer;
+				ComPtr<ID3D11Buffer> savedConstantBuffer;
 
-		FLOAT BlendFactors[4];
-		UINT BlendMask;
-		ComPtr<ID3D11BlendState> savedBlendState;
-		context->VSGetShader( savedVertexShader.GetAddressOf(), nullptr, nullptr );
-		context->PSGetShader( savedPixelShader.GetAddressOf(), nullptr, nullptr );
-		context->IAGetInputLayout( savedInputLayout.GetAddressOf() );
-		context->RSGetState( savedRasterizerState.GetAddressOf() );
-		context->OMGetBlendState( savedBlendState.GetAddressOf(), BlendFactors, &BlendMask );
-		context->OMGetRenderTargets( 1, savedRTV.GetAddressOf(), nullptr );
-		context->IAGetVertexBuffers( 0, 1, savedInputBuffer.ReleaseAndGetAddressOf(), &Stride, &Offset );
-		context->PSGetConstantBuffers( 5, 1, savedConstantBuffer.ReleaseAndGetAddressOf() );
+				context->VSGetShader( savedVertexShader.GetAddressOf(), nullptr, nullptr );
+				context->PSGetShader( savedPixelShader.GetAddressOf(), nullptr, nullptr );
+				context->IAGetInputLayout( savedInputLayout.GetAddressOf() );
+				context->RSGetState( savedRasterizerState.GetAddressOf() );
+				context->OMGetRenderTargets( 1, savedRTV.GetAddressOf(), nullptr );
+				context->PSGetShaderResources( 0, 1, savedSRV.GetAddressOf() );
+				context->IAGetVertexBuffers( 0, 1, savedInputBuffer.ReleaseAndGetAddressOf(), &Stride, &Offset );
+				context->PSGetConstantBuffers( 5, 1, savedConstantBuffer.ReleaseAndGetAddressOf() );
 
-		auto restore = wil::scope_exit([&] {
-			context->VSSetShader( savedVertexShader.Get(), nullptr, 0 );
-			context->PSSetShader( savedPixelShader.Get(), nullptr, 0 );
-			context->IASetInputLayout( savedInputLayout.Get() );
-			context->RSSetState( savedRasterizerState.Get() );
-			context->OMSetBlendState( savedBlendState.Get(), BlendFactors, BlendMask );
-			context->OMSetRenderTargets( 1, savedRTV.GetAddressOf(), nullptr );
-			context->IASetVertexBuffers( 0, 1, savedInputBuffer.GetAddressOf(), &Stride, &Offset );
-			context->PSSetConstantBuffers( 5, 1, savedConstantBuffer.GetAddressOf() );
-		});
+				auto restore = wil::scope_exit([&] {
+					context->VSSetShader( savedVertexShader.Get(), nullptr, 0 );
+					context->PSSetShader( savedPixelShader.Get(), nullptr, 0 );
+					context->IASetInputLayout( savedInputLayout.Get() );
+					context->RSSetState( savedRasterizerState.Get() );
+					context->OMSetRenderTargets( 1, savedRTV.GetAddressOf(), nullptr );
+					context->IASetVertexBuffers( 0, 1, savedInputBuffer.GetAddressOf(), &Stride, &Offset );
+					context->PSSetConstantBuffers( 5, 1, savedConstantBuffer.GetAddressOf() );
+					context->PSSetShaderResources( 0, 1, savedSRV.GetAddressOf() );
+				});
 
-		context->VSSetShader( vertexShader.Get(), nullptr, 0 );
-		context->PSSetShader( colorGradingPS.Get(), nullptr, 0 );
-		context->IASetInputLayout( inputLayout.Get() );
-		context->RSSetState( rasterizerState.Get() );
-		context->OMSetBlendState( blendState.Get(), BlendFactors, BlendMask );
+				context->VSSetShader( vertexShader.Get(), nullptr, 0 );
+				context->PSSetShader( colorGradingPS.Get(), nullptr, 0 );
+				context->IASetInputLayout( inputLayout.Get() );
+				context->RSSetState( rasterizerState.Get() );
 
-		context->OMSetRenderTargets( 1, newRtv.GetAddressOf(), nullptr );
+				context->OMSetRenderTargets( 1, newRtv.GetAddressOf(), nullptr );
 
-		UINT newStrides[1] = { 12 };
-		UINT newOffsets[1] = { 0 };
-		context->IASetVertexBuffers( 0, 1, colorGradingVB.GetAddressOf(), newStrides, newOffsets );
-		context->PSSetConstantBuffers( 5, 1, colorGradingCB.GetAddressOf() );
+				UINT newStrides[1] = { 12 };
+				UINT newOffsets[1] = { 0 };
+				context->IASetVertexBuffers( 0, 1, colorGradingVB.GetAddressOf(), newStrides, newOffsets );
+				context->PSSetConstantBuffers( 5, 1, colorGradingCB.GetAddressOf() );
+				context->PSSetShaderResources( 0, 1, srv.GetAddressOf() );
 		
-		// Draw color grading
-		context->Draw( 6, 0 );
+				// Draw color grading
+				context->Draw( 6, 0 );
 
-		context->CopyResource( rt.Get(), newRt.Get() );
+				context->CopyResource( rt.Get(), newRt.Get() );
+			}
+		}
 	}
 }

@@ -430,7 +430,6 @@ void STDMETHODCALLTYPE D3D11DeviceContext::IASetVertexBuffers(UINT StartSlot, UI
 
 void STDMETHODCALLTYPE D3D11DeviceContext::IASetIndexBuffer(ID3D11Buffer* pIndexBuffer, DXGI_FORMAT Format, UINT Offset)
 {
-    m_device->m_colorGrading->BeforeSetIndexBuffer(this);
     m_orig->IASetIndexBuffer(pIndexBuffer, Format, Offset);
 }
 
@@ -511,7 +510,8 @@ void STDMETHODCALLTYPE D3D11DeviceContext::OMSetRenderTargetsAndUnorderedAccessV
 
 void STDMETHODCALLTYPE D3D11DeviceContext::OMSetBlendState(ID3D11BlendState* pBlendState, const FLOAT BlendFactor[4], UINT SampleMask)
 {
-	m_orig->OMSetBlendState(pBlendState, BlendFactor, SampleMask);
+    m_device->m_colorGrading->BeforeOMSetBlendState( this, pBlendState );
+    m_orig->OMSetBlendState(pBlendState, BlendFactor, SampleMask);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::OMSetDepthStencilState(ID3D11DepthStencilState* pDepthStencilState, UINT StencilRef)

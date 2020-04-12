@@ -23,8 +23,8 @@ static_assert(std::is_trivial_v<ResourceMetadata>); // Private data is memcpy'd 
 // Heuristics of color grading:
 // 1. Find the bloom merger call
 // 2. From this draw call, save the following - vertex shader, input layout, rasterizer state, blend state (DS state seems to be same)
-// 2. Skip until the first DrawIndexed call after the bloom merger call - this will skip over AA (if any)
-// 3. Output RT of this DrawIndexed call is the output we need to apply color grading on
+// 3. Skip until the first blend state change - entire postprocessing uses the same blend state, subtitles/UI do not
+// 4. Output RT of the draw call to follow is the output we need to apply color grading on
 // TODO: CopyResource can be skipped if AA is performed - need to cache input of the bloom merger call and re-route the next non-indexed Draw call,
 //	     then apply color grading
 class ColorGrading
@@ -41,7 +41,7 @@ public:
 	void OnPixelShaderSet( ID3D11PixelShader* shader );
 	void BeforeDraw( ID3D11DeviceContext* context );
 	void BeforeDrawIndexed( ID3D11DeviceContext* context );
-	void BeforeSetIndexBuffer( ID3D11DeviceContext* context );
+	void BeforeOMSetBlendState( ID3D11DeviceContext* context, ID3D11BlendState* pBlendState );
 
 private:
 	enum class State
