@@ -41,7 +41,7 @@ HRESULT WINAPI D3D11CreateDevice_Export( IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE
 
 D3D11Device::D3D11Device(wil::unique_hmodule module, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> immediateContext)
     : m_d3dModule( std::move(module) ), m_orig( std::move(device) ),
-      m_colorGrading( std::make_unique<Effects::ColorGrading>(this) )
+      m_colorGrading( this )
 {
     m_orig.As(&m_origDxgi);
 
@@ -135,7 +135,7 @@ HRESULT STDMETHODCALLTYPE D3D11Device::CreatePixelShader(const void* pShaderByte
     HRESULT hr = m_orig->CreatePixelShader(pShaderBytecode, BytecodeLength, pClassLinkage, ppPixelShader);
     if ( SUCCEEDED(hr) )
     {
-        m_colorGrading->AnnotatePixelShader( *ppPixelShader, pShaderBytecode, BytecodeLength );
+        m_colorGrading.AnnotatePixelShader( *ppPixelShader, pShaderBytecode, BytecodeLength );
     }
     return hr;
 }
@@ -378,7 +378,7 @@ void STDMETHODCALLTYPE D3D11DeviceContext::PSSetShaderResources(UINT StartSlot, 
 void STDMETHODCALLTYPE D3D11DeviceContext::PSSetShader(ID3D11PixelShader* pPixelShader, ID3D11ClassInstance* const* ppClassInstances, UINT NumClassInstances)
 {
     m_orig->PSSetShader(pPixelShader, ppClassInstances, NumClassInstances);
-    m_device->m_colorGrading->OnPixelShaderSet(pPixelShader);
+    m_device->GetColorGrading().OnPixelShaderSet(pPixelShader);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::PSSetSamplers(UINT StartSlot, UINT NumSamplers, ID3D11SamplerState* const* ppSamplers)
@@ -393,13 +393,12 @@ void STDMETHODCALLTYPE D3D11DeviceContext::VSSetShader(ID3D11VertexShader* pVert
 
 void STDMETHODCALLTYPE D3D11DeviceContext::DrawIndexed(UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
 {
-    m_device->m_colorGrading->BeforeDrawIndexed(this);
     m_orig->DrawIndexed(IndexCount, StartIndexLocation, BaseVertexLocation);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::Draw(UINT VertexCount, UINT StartVertexLocation)
 {
-    m_device->m_colorGrading->BeforeDraw(this);
+    m_device->GetColorGrading().BeforeDraw(this, VertexCount, StartVertexLocation);
     m_orig->Draw(VertexCount, StartVertexLocation);
 }
 
@@ -510,7 +509,7 @@ void STDMETHODCALLTYPE D3D11DeviceContext::OMSetRenderTargetsAndUnorderedAccessV
 
 void STDMETHODCALLTYPE D3D11DeviceContext::OMSetBlendState(ID3D11BlendState* pBlendState, const FLOAT BlendFactor[4], UINT SampleMask)
 {
-    m_device->m_colorGrading->BeforeOMSetBlendState( this, pBlendState );
+    m_device->GetColorGrading().BeforeOMSetBlendState( this, pBlendState );
     m_orig->OMSetBlendState(pBlendState, BlendFactor, SampleMask);
 }
 

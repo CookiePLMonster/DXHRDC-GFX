@@ -85,9 +85,8 @@ public:
     // IWrapperObject
     virtual HRESULT STDMETHODCALLTYPE GetUnderlyingInterface(REFIID riid, void** ppvObject) override;
 
-    // DXHR effects
-    // Must be private so device context can access those
-    std::unique_ptr<Effects::ColorGrading> m_colorGrading;
+    // DXHR effects accessors
+    Effects::ColorGrading& GetColorGrading() { return m_colorGrading; }
 
 private:
     wil::unique_hmodule m_d3dModule;
@@ -97,6 +96,9 @@ private:
     // NOTE: We cannot use WRL::ComPtr here, as we call Release on this context manually
     // when D3D11Device's reference count has reached 1 (as in, only immediate context references it)
     class D3D11DeviceContext* m_immediateContext = nullptr;
+
+    // DXHR effects
+    Effects::ColorGrading m_colorGrading;
 };
 
 class D3D11DeviceContext final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<ID3D11DeviceContext, ID3D11DeviceChild> >
