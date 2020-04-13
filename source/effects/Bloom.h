@@ -14,6 +14,7 @@ namespace Effects
 // Changes to bloom consist of 2 separate parts:
 // - DXHR bloom consists of 4 distinct shaders, DXHR DC - of 3
 // - Constant buffers are different for draw 1 and 4
+// - Merger shader is different and has different inputs
 class Bloom
 {
 public:
@@ -35,6 +36,8 @@ private:
 		Initial,
 		Bloom2Set,
 		Bloom2Drawn,
+
+		MergerPSFound,
 	};
 
 	State m_state = State::Initial;

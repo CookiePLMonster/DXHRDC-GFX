@@ -77,6 +77,23 @@ void Effects::Bloom::CreateAlternatePixelShader( ID3D11PixelShader* shader, cons
 			return;
 		}
 	}
+
+	// Special handling for blur merger shader, because it's also used by ColorGrading
+	ResourceMetadata meta;
+	UINT size = sizeof(meta);
+	if ( SUCCEEDED(shader->GetPrivateData(__uuidof(meta), &size, &meta)) )
+	{
+		if ( meta.m_type == ResourceMetadata::Type::BloomMergerShader )
+		{
+			// Create an alternate shader and also annotate it as a blur merger shader
+			ComPtr<ID3D11PixelShader> alternateShader;
+			if ( SUCCEEDED(m_device->CreatePixelShader( BLOOM_MERGER_PS_BYTECODE, sizeof(BLOOM_MERGER_PS_BYTECODE), nullptr, alternateShader.GetAddressOf() )) )
+			{
+				shader->SetPrivateDataInterface( GUID_AlternateResource, alternateShader.Get() );
+				alternateShader->SetPrivateData( __uuidof(meta), sizeof(meta), &meta );
+			}
+		}
+	}
 }
 
 ComPtr<ID3D11PixelShader> Effects::Bloom::BeforePixelShaderSet( ID3D11DeviceContext* context, ID3D11PixelShader* shader )
@@ -106,7 +123,7 @@ ComPtr<ID3D11PixelShader> Effects::Bloom::BeforePixelShaderSet( ID3D11DeviceCont
 		{
 			m_state = State::Bloom2Set;
 		}
-		if ( meta.m_type == ResourceMetadata::Type::BloomShader4 ) // Bloom shader 4 - replace shader and bind a custom constant buffer
+		else if ( meta.m_type == ResourceMetadata::Type::BloomShader4 ) // Bloom shader 4 - replace shader and bind a custom constant buffer
 		{
 			ComPtr<ID3D11PixelShader> replacedShader;
 			size = sizeof(ID3D11PixelShader*);
@@ -116,6 +133,17 @@ ComPtr<ID3D11PixelShader> Effects::Bloom::BeforePixelShaderSet( ID3D11DeviceCont
 
 				context->PSSetConstantBuffers( 3, 1, m_shader4CB.GetAddressOf() );
 			}
+		}
+		else if ( meta.m_type == ResourceMetadata::Type::BloomMergerShader ) // Bloom merger  - replace shader, then rebind inputs before drawing
+		{
+			ComPtr<ID3D11PixelShader> replacedShader;
+			size = sizeof(ID3D11PixelShader*);
+			if ( SUCCEEDED(shader->GetPrivateData(GUID_AlternateResource, &size, replacedShader.GetAddressOf())) )
+			{
+				result = std::move(replacedShader);
+
+				m_state = State::MergerPSFound;
+			}	
 		}
 	}
 	return result;
@@ -129,6 +157,28 @@ void Effects::Bloom::BeforeDraw( ID3D11DeviceContext* context )
 
 		// Replace with an alternate bloom3 shader
 		context->PSSetShader( m_bloom3PS.Get(), nullptr, 0 );
+	}
+	else if ( m_state == State::MergerPSFound )
+	{
+		m_state = State::Initial;
+
+		// Rebind inputs to match the modified shader
+		ID3D11ShaderResourceView* v[3];
+		context->PSGetShaderResources( 0, 3, v );
+		ComPtr<ID3D11ShaderResourceView> views[3];
+		views[0].Attach( v[0] );
+		views[1].Attach( v[1] );
+		views[2].Attach( v[2] );
+
+		// SRV2 goes to SRV0, SRV0 goes to SRV1
+		ID3D11ShaderResourceView* reboundSRV[] = { views[2].Get(), views[0].Get() };
+		context->PSSetShaderResources( 0, 2, reboundSRV );
+
+		ComPtr<ID3D11Buffer> cb;
+		context->PSGetConstantBuffers( 5, 1, cb.GetAddressOf() );
+
+		// CB5 goes to CB3
+		context->PSSetConstantBuffers( 3, 1, cb.GetAddressOf() );
 	}
 }
 
