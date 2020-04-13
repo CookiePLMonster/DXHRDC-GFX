@@ -2,29 +2,17 @@
 
 #include <d3d11.h>
 
-#include <type_traits>
 #include <optional>
 #include <tuple>
 
 #include <wrl/client.h>
 
+#include "Metadata.h"
+
 using namespace Microsoft::WRL;
 
 namespace Effects
 {
-
-// Private data we attach to "interesting" resources
-struct __declspec(uuid("5383C3EB-9DE8-48FC-8C88-8721759EA8E6")) ResourceMetadata
-{
-	// Found by hashing
-	enum class Type
-	{
-		BloomMergerShader,
-	};
-
-	Type m_type;
-};
-static_assert(std::is_trivial_v<ResourceMetadata>); // Private data is memcpy'd around and destructed by freeing memory only
 
 
 // Heuristics of color grading:
@@ -60,7 +48,7 @@ private:
 	};
 
 	State m_state = State::Initial;
-	ID3D11Device* m_device; // ColorGrading class cannot outlive the device
+	ID3D11Device* m_device; // Effect cannot outlive the device
 
 	// Persistent data - created on demand and invalidated only on resolution/settings change
 	struct PersistentData

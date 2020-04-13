@@ -11,6 +11,7 @@
 
 // Effects
 #include "effects/ColorGrading.h"
+#include "effects/Bloom.h"
 
 using namespace Microsoft::WRL;
 
@@ -87,6 +88,7 @@ public:
 
     // DXHR effects accessors
     Effects::ColorGrading& GetColorGrading() { return m_colorGrading; }
+    Effects::Bloom& GetBloom() { return m_bloom; }
 
 private:
     wil::unique_hmodule m_d3dModule;
@@ -99,6 +101,7 @@ private:
 
     // DXHR effects
     Effects::ColorGrading m_colorGrading;
+    Effects::Bloom m_bloom;
 };
 
 class D3D11DeviceContext final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<ID3D11DeviceContext, ID3D11DeviceChild> >
