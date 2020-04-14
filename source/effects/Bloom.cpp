@@ -134,7 +134,7 @@ ComPtr<ID3D11PixelShader> Effects::Bloom::BeforePixelShaderSet( ID3D11DeviceCont
 				context->PSSetConstantBuffers( 3, 1, m_shader4CB.GetAddressOf() );
 			}
 		}
-		else if ( meta.m_type == ResourceMetadata::Type::BloomMergerShader ) // Bloom merger  - replace shader, then rebind inputs before drawing
+		else if ( meta.m_type == ResourceMetadata::Type::BloomMergerShader ) // Bloom merger - replace shader, then rebind inputs before drawing
 		{
 			ComPtr<ID3D11PixelShader> replacedShader;
 			size = sizeof(ID3D11PixelShader*);

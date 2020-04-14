@@ -15,6 +15,9 @@ struct __declspec(uuid("5383C3EB-9DE8-48FC-8C88-8721759EA8E6")) ResourceMetadata
 		BloomShader1, // Different in DXHR
 		BloomShader2, // Same in DXHR, but holds an additional "BloomShader3" as an additional resource
 		BloomShader4, // Different in DXHR
+
+		LightingShader1,
+		LightingShader2,
 	};
 
 	Type m_type;
