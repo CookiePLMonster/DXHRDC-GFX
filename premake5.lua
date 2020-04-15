@@ -56,7 +56,9 @@ filter { "platforms:Win64" }
 	architecture "x86_64"
 
 filter { "toolset:*_xp"}
+	defines { "WINVER=0x0501", "_WIN32_WINNT=0x0501" } -- Target WinXP
 	buildoptions { "/Zc:threadSafeInit-" }
 
 filter { "toolset:not *_xp"}
+	defines { "WINVER=0x0601", "_WIN32_WINNT=0x0601" } -- Target Win7
 	buildoptions { "/permissive-" }
