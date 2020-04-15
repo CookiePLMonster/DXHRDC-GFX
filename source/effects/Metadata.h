@@ -18,6 +18,7 @@ struct __declspec(uuid("5383C3EB-9DE8-48FC-8C88-8721759EA8E6")) ResourceMetadata
 
 		LightingShader1,
 		LightingShader2,
+		LightingShader3,
 	};
 
 	Type m_type;
