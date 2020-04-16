@@ -29,7 +29,7 @@ void Effects::Lighting::CreateAlternatePixelShader(ID3D11PixelShader * shader, c
 			return;
 		}
 
-		if ( memcmp( reinterpret_cast<const uint8_t*>(bytecode) + 4, LIGHTING_SHADER2_HASH, sizeof(LIGHTING_SHADER2_HASH) ) == 0 )
+		/*if ( memcmp( reinterpret_cast<const uint8_t*>(bytecode) + 4, LIGHTING_SHADER2_HASH, sizeof(LIGHTING_SHADER2_HASH) ) == 0 )
 		{
 			ResourceMetadata resource;
 			resource.m_type = ResourceMetadata::Type::LightingShader2;
@@ -57,6 +57,7 @@ void Effects::Lighting::CreateAlternatePixelShader(ID3D11PixelShader * shader, c
 				shader->SetPrivateDataInterface( GUID_AlternateResource, alternateShader.Get() );
 			}
 			return;
+		}*/
 		}
 	}
 }
