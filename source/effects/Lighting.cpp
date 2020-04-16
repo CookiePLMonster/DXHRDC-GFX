@@ -1,7 +1,8 @@
 #include "Lighting.h"
 
 #include <cstdint>
-#include <vector>
+
+#include "../wil/resource.h"
 
 #include "Lighting_shader.h"
 
@@ -60,17 +61,25 @@ void Effects::Lighting::CreateAlternatePixelShader(ID3D11PixelShader * shader, c
 	}
 }
 
-bool Effects::Lighting::OnPSSetShaderResources(ID3D11DeviceContext* context, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView* const* ppShaderResourceViews)
+bool Effects::Lighting::OnDrawIndexed(ID3D11DeviceContext* context, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
 {
-	if ( m_swapSRVs && StartSlot == 0 && NumViews >= 2 )
+	if ( m_swapSRVs )
 	{
-		using std::swap;
+		// Swap SRV0 and SRV1 around, then restore
+		ID3D11ShaderResourceView* resources[2]; // Warning - raw pointers!
+		context->PSGetShaderResources( 0, _countof(resources), resources );
+		auto restore = wil::scope_exit([&] {
+			context->PSSetShaderResources( 0, _countof(resources), resources );
+			for ( auto* r : resources )
+			{
+				r->Release();
+			}
+		});
 
-		std::vector<ID3D11ShaderResourceView*> views( ppShaderResourceViews, ppShaderResourceViews + NumViews );
-		// Swap SRV0 with SRV1
-		swap( views[0], views[1] );
+		ID3D11ShaderResourceView* const swappedResources[2] = { resources[1], resources[0] }; // Warning - raw pointers!
+		context->PSSetShaderResources( 0, _countof(swappedResources), swappedResources );
 
-		context->PSSetShaderResources( StartSlot, NumViews, views.data() );
+		context->DrawIndexed( IndexCount, StartIndexLocation, BaseVertexLocation );
 		return true;
 	}
 	return false;

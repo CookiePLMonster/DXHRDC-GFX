@@ -374,10 +374,7 @@ void STDMETHODCALLTYPE D3D11DeviceContext::VSSetConstantBuffers(UINT StartSlot, 
 
 void STDMETHODCALLTYPE D3D11DeviceContext::PSSetShaderResources(UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView* const* ppShaderResourceViews)
 {
-    if ( !m_device->GetLighting().OnPSSetShaderResources(m_orig.Get(), StartSlot, NumViews, ppShaderResourceViews) ) // For relevant resources, Lighting sets resources by itself                                           
-    {                                                                                               // and this method returns true
-	    m_orig->PSSetShaderResources(StartSlot, NumViews, ppShaderResourceViews);
-    }
+    m_orig->PSSetShaderResources(StartSlot, NumViews, ppShaderResourceViews);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::PSSetShader(ID3D11PixelShader* pPixelShader, ID3D11ClassInstance* const* ppClassInstances, UINT NumClassInstances)
@@ -401,7 +398,10 @@ void STDMETHODCALLTYPE D3D11DeviceContext::VSSetShader(ID3D11VertexShader* pVert
 
 void STDMETHODCALLTYPE D3D11DeviceContext::DrawIndexed(UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation)
 {
-    m_orig->DrawIndexed(IndexCount, StartIndexLocation, BaseVertexLocation);
+    if ( !m_device->GetLighting().OnDrawIndexed(m_orig.Get(), IndexCount, StartIndexLocation, BaseVertexLocation) )
+    {
+        m_orig->DrawIndexed(IndexCount, StartIndexLocation, BaseVertexLocation);
+    }
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::Draw(UINT VertexCount, UINT StartVertexLocation)

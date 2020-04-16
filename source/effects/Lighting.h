@@ -23,7 +23,7 @@ public:
 
 	void CreateAlternatePixelShader( ID3D11PixelShader* shader, const void* bytecode, SIZE_T length );
 
-	bool OnPSSetShaderResources( ID3D11DeviceContext* context, UINT StartSlot, UINT NumViews, ID3D11ShaderResourceView* const* ppShaderResourceViews );
+	bool OnDrawIndexed( ID3D11DeviceContext* context, UINT IndexCount, UINT StartIndexLocation, INT BaseVertexLocation );
 	ComPtr<ID3D11PixelShader> BeforePixelShaderSet( ID3D11DeviceContext* context, ID3D11PixelShader* shader );
 
 private:
