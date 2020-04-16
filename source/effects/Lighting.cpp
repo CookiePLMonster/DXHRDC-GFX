@@ -11,6 +11,7 @@ void Effects::Lighting::CreateAlternatePixelShader(ID3D11PixelShader * shader, c
 	static constexpr uint32_t LIGHTING_SHADER1_HASH[4] = { 0x4abe618c, 0xa282fa5b, 0xdcde9b8b, 0xaf4aa8fb };
 	static constexpr uint32_t LIGHTING_SHADER2_HASH[4] = { 0x65ae0cbf, 0x89721070, 0x6078754d, 0xa3a24d48 };
 	static constexpr uint32_t LIGHTING_SHADER3_HASH[4] = { 0x2ede696f, 0x36c567e9, 0xaacac074, 0xb5f3ad15 };
+	static constexpr uint32_t LIGHTING_SHADER4_HASH[4] = { 0x4ee86a1e, 0xbf1eba8f, 0x48e4cf30, 0x635dc3f9 };
 
 	if ( length >= 4 + sizeof(LIGHTING_SHADER1_HASH) )
 	{
@@ -58,6 +59,20 @@ void Effects::Lighting::CreateAlternatePixelShader(ID3D11PixelShader * shader, c
 			}
 			return;
 		}*/
+
+		if ( memcmp( reinterpret_cast<const uint8_t*>(bytecode) + 4, LIGHTING_SHADER4_HASH, sizeof(LIGHTING_SHADER4_HASH) ) == 0 )
+		{
+			ResourceMetadata resource;
+			resource.m_type = ResourceMetadata::Type::LightingShader4;
+			shader->SetPrivateData( __uuidof(resource), sizeof(resource), &resource );
+
+			// Create an alternate shader
+			ComPtr<ID3D11PixelShader> alternateShader;
+			if ( SUCCEEDED(m_device->CreatePixelShader( LIGHTING4_PS_BYTECODE, sizeof(LIGHTING4_PS_BYTECODE), nullptr, alternateShader.GetAddressOf() )) )
+			{
+				shader->SetPrivateDataInterface( GUID_AlternateResource, alternateShader.Get() );
+			}
+			return;
 		}
 	}
 }
@@ -97,7 +112,8 @@ ComPtr<ID3D11PixelShader> Effects::Lighting::BeforePixelShaderSet(ID3D11DeviceCo
 	UINT size = sizeof(meta);
 	if ( SUCCEEDED(shader->GetPrivateData(__uuidof(meta), &size, &meta)) )
 	{
-		if ( meta.m_type == ResourceMetadata::Type::LightingShader1 || meta.m_type == ResourceMetadata::Type::LightingShader2 || meta.m_type == ResourceMetadata::Type::LightingShader3 )
+		if ( meta.m_type == ResourceMetadata::Type::LightingShader1 || meta.m_type == ResourceMetadata::Type::LightingShader2 || meta.m_type == ResourceMetadata::Type::LightingShader3 ||
+			 meta.m_type == ResourceMetadata::Type::LightingShader4 )
 		{
 			ComPtr<ID3D11PixelShader> replacedShader;
 			size = sizeof(ID3D11PixelShader*);
