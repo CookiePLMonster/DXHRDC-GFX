@@ -81,9 +81,10 @@ void Effects::ColorGrading::BeforeOMSetBlendState( ID3D11DeviceContext* context,
 			m_state = State::Initial;
 
 			ComPtr<ID3D11RenderTargetView> curRTV;
-			context->OMGetRenderTargets( 1, curRTV.GetAddressOf(), nullptr );
+			ComPtr<ID3D11DepthStencilView> curDSV;
+			context->OMGetRenderTargets( 1, curRTV.GetAddressOf(), curDSV.GetAddressOf() );
 			auto restoreRTV = wil::scope_exit([&] {
-				context->OMSetRenderTargets( 1, curRTV.GetAddressOf(), nullptr );
+				context->OMSetRenderTargets( 1, curRTV.GetAddressOf(), curDSV.Get() );
 			});
 
 			ComPtr<ID3D11Resource> curRT;
