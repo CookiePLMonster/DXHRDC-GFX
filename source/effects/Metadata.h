@@ -30,4 +30,8 @@ static_assert(std::is_trivial_v<ResourceMetadata>); // Private data is memcpy'd 
 static const GUID GUID_AlternateResource = 
 	{ 0x2bbe62d5, 0xab9d, 0x47b1, { 0xae, 0xd2, 0xf4, 0xc, 0x37, 0x5b, 0xdd, 0xf } };
 
+
+// Debug toggle for effects
+int KeyToggled(int vk, int min = 0, int max = 1);
+
 };

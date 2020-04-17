@@ -30,7 +30,7 @@ void Effects::Lighting::CreateAlternatePixelShader(ID3D11PixelShader * shader, c
 			return;
 		}
 
-		/*if ( memcmp( reinterpret_cast<const uint8_t*>(bytecode) + 4, LIGHTING_SHADER2_HASH, sizeof(LIGHTING_SHADER2_HASH) ) == 0 )
+		if ( memcmp( reinterpret_cast<const uint8_t*>(bytecode) + 4, LIGHTING_SHADER2_HASH, sizeof(LIGHTING_SHADER2_HASH) ) == 0 )
 		{
 			ResourceMetadata resource;
 			resource.m_type = ResourceMetadata::Type::LightingShader2;
@@ -58,7 +58,7 @@ void Effects::Lighting::CreateAlternatePixelShader(ID3D11PixelShader * shader, c
 				shader->SetPrivateDataInterface( GUID_AlternateResource, alternateShader.Get() );
 			}
 			return;
-		}*/
+		}
 
 		if ( memcmp( reinterpret_cast<const uint8_t*>(bytecode) + 4, LIGHTING_SHADER4_HASH, sizeof(LIGHTING_SHADER4_HASH) ) == 0 )
 		{
@@ -106,14 +106,16 @@ ComPtr<ID3D11PixelShader> Effects::Lighting::BeforePixelShaderSet(ID3D11DeviceCo
 	ComPtr<ID3D11PixelShader> result(shader);
 	m_swapSRVs = false;
 
-	if ( GetAsyncKeyState(VK_F4) & 0x8000 ) return result;
+	int keyState = KeyToggled(VK_F4, 0, 2);
+
+	if ( keyState == 0 ) return result;
 
 	ResourceMetadata meta;
 	UINT size = sizeof(meta);
 	if ( SUCCEEDED(shader->GetPrivateData(__uuidof(meta), &size, &meta)) )
 	{
-		if ( meta.m_type == ResourceMetadata::Type::LightingShader1 || meta.m_type == ResourceMetadata::Type::LightingShader2 || meta.m_type == ResourceMetadata::Type::LightingShader3 ||
-			 meta.m_type == ResourceMetadata::Type::LightingShader4 )
+		if ( (meta.m_type == ResourceMetadata::Type::LightingShader1 || meta.m_type == ResourceMetadata::Type::LightingShader4) ||
+			 (keyState == 2 && (meta.m_type == ResourceMetadata::Type::LightingShader2 || meta.m_type == ResourceMetadata::Type::LightingShader3)) )
 		{
 			ComPtr<ID3D11PixelShader> replacedShader;
 			size = sizeof(ID3D11PixelShader*);
