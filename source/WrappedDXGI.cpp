@@ -7,6 +7,46 @@
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx11.h"
 
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// Functions specific to ImGui
+namespace UI
+{
+
+static WNDPROC orgWndProc;
+LRESULT WINAPI UIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    LRESULT imguiResult = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+    if ( imguiResult != 0 ) return imguiResult;
+
+    const ImGuiIO& io = ImGui::GetIO();
+    if ( io.WantCaptureMouse || io.WantCaptureKeyboard )
+    {
+        if ( io.WantCaptureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
+        if ( io.WantCaptureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
+
+        // Filter Raw Input
+        if ( msg == WM_INPUT )
+        {
+            RAWINPUTHEADER header;
+            UINT size = sizeof(header);
+
+            if ( GetRawInputData( reinterpret_cast<HRAWINPUT >(lParam), RID_HEADER, &header, &size, sizeof(RAWINPUTHEADER) ) != -1 )
+            {
+                if ( (io.WantCaptureMouse && header.dwType == RIM_TYPEMOUSE) || (io.WantCaptureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
+                {
+                    // Let the OS perform cleanup
+                    return DefWindowProc(hWnd, msg, wParam, lParam);
+                }
+            }
+        }
+    }
+
+    return CallWindowProc(orgWndProc, hWnd, msg, wParam, lParam);
+}
+
+}
+
 HRESULT WINAPI CreateDXGIFactory_Export( REFIID riid, void** ppFactory )
 {
     *ppFactory = nullptr;
@@ -135,7 +175,8 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
     // We set up Dear Imgui in swapchain constructor and tear it down in the destructor
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
-    ImGuiIO& io = ImGui::GetIO(); (void)io;
+    ImGuiIO& io = ImGui::GetIO();
+    io.IniFilename = nullptr;
 
     // Setup Dear ImGui style
     ImGui::StyleColorsDark();
@@ -151,6 +192,10 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
 
         ImGui_ImplDX11_Init(d3dDevice.Get(), d3dDeviceContext.Get()); // Init holds a reference to both
     }
+
+    // Hook into the window proc
+    UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
+    SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
 
     // Immediately start a new frame - we'll be starting new frames after each Present
     ImGui_ImplDX11_NewFrame();
