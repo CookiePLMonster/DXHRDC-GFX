@@ -20,7 +20,7 @@ workspace "*"
 	}
 
 	files { "source/*.h", "source/*.cpp", "source/resources/*.rc", "source/wil/*", "source/*.def",
- 			"source/effects/*" }
+ 			"source/effects/*", "source/imgui/*" }
 
 	-- Disable exceptions in WIL
 	defines { "WIL_SUPPRESS_EXCEPTIONS" }
