@@ -332,7 +332,7 @@ HRESULT STDMETHODCALLTYPE D3D11Device::GetUnderlyingInterface(REFIID riid, void*
 
 // ====================================================
 
-inline D3D11DeviceContext::D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device)
+D3D11DeviceContext::D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device)
     : m_device(std::move(device)), m_orig(std::move(context))
 {
 }
