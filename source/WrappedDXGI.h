@@ -43,7 +43,8 @@ private:
 class DXGISwapChain final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<IDXGISwapChain, IDXGIDeviceSubObject, IDXGIObject> >
 {
 public:
-	DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactory> factory, ComPtr<IUnknown> device);
+	DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactory> factory, ComPtr<IUnknown> device, const DXGI_SWAP_CHAIN_DESC* desc);
+	virtual ~DXGISwapChain() override;
 
 	virtual HRESULT STDMETHODCALLTYPE QueryInterface(REFIID riid, void** ppvObject) override; // Overload to allow DXGI to query for internal, undocumented interfaces
 
