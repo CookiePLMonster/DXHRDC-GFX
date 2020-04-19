@@ -15,32 +15,36 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 namespace UI
 {
 
+static bool hasImGuiContext = false;
 static WNDPROC orgWndProc;
 LRESULT WINAPI UIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    LRESULT imguiResult = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
-    if ( imguiResult != 0 ) return imguiResult;
-
-    const ImGuiIO& io = ImGui::GetIO();
-    const bool captureMouse = io.WantCaptureMouse || io.MouseDrawCursor;
-    const bool captureKeyboard = io.WantCaptureKeyboard;
-    if ( captureMouse || captureKeyboard )
+    if ( hasImGuiContext )
     {
-        if ( captureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
-        if ( captureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
+        LRESULT imguiResult = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+        if ( imguiResult != 0 ) return imguiResult;
 
-        // Filter Raw Input
-        if ( msg == WM_INPUT )
+        const ImGuiIO& io = ImGui::GetIO();
+        const bool captureMouse = io.WantCaptureMouse || io.MouseDrawCursor;
+        const bool captureKeyboard = io.WantCaptureKeyboard;
+        if ( captureMouse || captureKeyboard )
         {
-            RAWINPUTHEADER header;
-            UINT size = sizeof(header);
+            if ( captureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
+            if ( captureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
 
-            if ( GetRawInputData( reinterpret_cast<HRAWINPUT >(lParam), RID_HEADER, &header, &size, sizeof(RAWINPUTHEADER) ) != -1 )
+            // Filter Raw Input
+            if ( msg == WM_INPUT )
             {
-                if ( (captureMouse && header.dwType == RIM_TYPEMOUSE) || (captureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
+                RAWINPUTHEADER header;
+                UINT size = sizeof(header);
+
+                if ( GetRawInputData( reinterpret_cast<HRAWINPUT >(lParam), RID_HEADER, &header, &size, sizeof(RAWINPUTHEADER) ) != -1 )
                 {
-                    // Let the OS perform cleanup
-                    return DefWindowProc(hWnd, msg, wParam, lParam);
+                    if ( (captureMouse && header.dwType == RIM_TYPEMOUSE) || (captureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
+                    {
+                        // Let the OS perform cleanup
+                        return DefWindowProc(hWnd, msg, wParam, lParam);
+                    }
                 }
             }
         }
@@ -179,6 +183,8 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
     // We set up Dear Imgui in swapchain constructor and tear it down in the destructor
     IMGUI_CHECKVERSION();
     ImGui::CreateContext();
+    UI::hasImGuiContext = true;
+
     ImGuiIO& io = ImGui::GetIO();
     io.IniFilename = nullptr;
 
@@ -197,9 +203,12 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
         ImGui_ImplDX11_Init(d3dDevice.Get(), d3dDeviceContext.Get()); // Init holds a reference to both
     }
 
-    // Hook into the window proc
-    UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
-    SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
+    // Hook into the window proc (only once per session)
+    if ( UI::orgWndProc == nullptr )
+    {
+        UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
+        SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
+    }
 
     // Immediately start a new frame - we'll be starting new frames after each Present
     ImGui_ImplDX11_NewFrame();
@@ -211,6 +220,8 @@ DXGISwapChain::~DXGISwapChain()
 {
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
+
+    UI::hasImGuiContext = false;
     ImGui::DestroyContext();
 }
 
