@@ -25,7 +25,7 @@ void Effects::ColorGrading::AnnotatePixelShader(ID3D11PixelShader* shader, const
 
 void Effects::ColorGrading::OnPixelShaderSet(ID3D11PixelShader* shader)
 {
-	if ( KeyToggled(VK_F2) == 0 ) return;
+	if ( !SETTINGS.colorGradingEnabled ) return;
 
 	ResourceMetadata meta;
 	UINT size = sizeof(meta);

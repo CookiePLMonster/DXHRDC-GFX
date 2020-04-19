@@ -106,16 +106,14 @@ ComPtr<ID3D11PixelShader> Effects::Lighting::BeforePixelShaderSet(ID3D11DeviceCo
 	ComPtr<ID3D11PixelShader> result(shader);
 	m_swapSRVs = false;
 
-	int keyState = KeyToggled(VK_F4, 0, 2);
-
-	if ( keyState == 0 ) return result;
+	if ( SETTINGS.lightingType == 0 ) return result;
 
 	ResourceMetadata meta;
 	UINT size = sizeof(meta);
 	if ( SUCCEEDED(shader->GetPrivateData(__uuidof(meta), &size, &meta)) )
 	{
 		if ( (meta.m_type == ResourceMetadata::Type::LightingShader1 || meta.m_type == ResourceMetadata::Type::LightingShader4) ||
-			 (keyState == 2 && (meta.m_type == ResourceMetadata::Type::LightingShader2 || meta.m_type == ResourceMetadata::Type::LightingShader3)) )
+			 (SETTINGS.lightingType == 2 && (meta.m_type == ResourceMetadata::Type::LightingShader2 || meta.m_type == ResourceMetadata::Type::LightingShader3)) )
 		{
 			ComPtr<ID3D11PixelShader> replacedShader;
 			size = sizeof(ID3D11PixelShader*);

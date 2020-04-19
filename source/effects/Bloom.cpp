@@ -100,7 +100,7 @@ ComPtr<ID3D11PixelShader> Effects::Bloom::BeforePixelShaderSet( ID3D11DeviceCont
 {
 	ComPtr<ID3D11PixelShader> result(shader);
 
-	if ( KeyToggled(VK_F3) == 0 ) return result;
+	if ( SETTINGS.bloomType == 0 ) return result;
 
 	m_state = State::Initial;
 	

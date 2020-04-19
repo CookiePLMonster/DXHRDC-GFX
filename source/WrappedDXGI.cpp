@@ -7,6 +7,8 @@
 #include "imgui/imgui_impl_win32.h"
 #include "imgui/imgui_impl_dx11.h"
 
+#include "effects/Metadata.h"
+
 extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
 
 // Functions specific to ImGui
@@ -20,10 +22,12 @@ LRESULT WINAPI UIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
     if ( imguiResult != 0 ) return imguiResult;
 
     const ImGuiIO& io = ImGui::GetIO();
-    if ( io.WantCaptureMouse || io.WantCaptureKeyboard )
+    const bool captureMouse = io.WantCaptureMouse || io.MouseDrawCursor;
+    const bool captureKeyboard = io.WantCaptureKeyboard;
+    if ( captureMouse || captureKeyboard )
     {
-        if ( io.WantCaptureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
-        if ( io.WantCaptureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
+        if ( captureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
+        if ( captureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
 
         // Filter Raw Input
         if ( msg == WM_INPUT )
@@ -33,7 +37,7 @@ LRESULT WINAPI UIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
             if ( GetRawInputData( reinterpret_cast<HRAWINPUT >(lParam), RID_HEADER, &header, &size, sizeof(RAWINPUTHEADER) ) != -1 )
             {
-                if ( (io.WantCaptureMouse && header.dwType == RIM_TYPEMOUSE) || (io.WantCaptureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
+                if ( (captureMouse && header.dwType == RIM_TYPEMOUSE) || (captureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
                 {
                     // Let the OS perform cleanup
                     return DefWindowProc(hWnd, msg, wParam, lParam);
@@ -248,7 +252,56 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::GetDevice(REFIID riid, void** ppDevice)
 HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
 {
     // Draw all UI widgets
-    ImGui::ShowDemoWindow();
+    {
+        using namespace Effects;
+
+        ImGuiIO& io = ImGui::GetIO();
+
+        static bool keyPressed = false;
+        if ( io.KeysDown[VK_F11] )
+        {
+            if ( !keyPressed )
+            {
+                SETTINGS.isShown = !SETTINGS.isShown;
+                keyPressed = true;
+            }
+        }
+        else
+        {
+            keyPressed = false;
+        }
+
+        if ( SETTINGS.isShown )
+        {
+            //ImGui::ShowDemoWindow();
+            constexpr float DIST_FROM_CORNER = 20.0f;
+            const ImVec2 window_pos = ImVec2(io.DisplaySize.x - DIST_FROM_CORNER, DIST_FROM_CORNER);
+            ImGui::SetNextWindowPos(window_pos, ImGuiCond_Once, ImVec2(1.0f, 0.0f));
+            if ( ImGui::Begin( "DXHRDC-GFX Settings", &SETTINGS.isShown, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse ) )
+            {
+                int id = 0;
+
+                ImGui::Checkbox("Enable Gold Filter", &SETTINGS.colorGradingEnabled);
+
+                ImGui::PushID(id++);
+                ImGui::Text( "Bloom Style" );
+                ImGui::RadioButton("DX:HR", &SETTINGS.bloomType, 1); ImGui::SameLine();
+                ImGui::RadioButton("DX:HR DC", &SETTINGS.bloomType, 0);
+                ImGui::PopID();
+
+                ImGui::PushID(id++);
+                ImGui::Text( "Lighting Style" );
+                ImGui::RadioButton("DX:HR", &SETTINGS.lightingType, 2);
+                ImGui::RadioButton("DX:HR DC (Fixed)", &SETTINGS.lightingType, 1); ImGui::SameLine();
+                ImGui::RadioButton("DX:HR DC", &SETTINGS.lightingType, 0);
+                ImGui::PopID();
+            }
+
+            ImGui::End();
+        }
+
+        io.MouseDrawCursor = SETTINGS.isShown;
+    }
 
     ImGui::Render();
 
