@@ -36,8 +36,10 @@ public:
 	void OnPixelShaderSet( ID3D11PixelShader* shader );
 	void BeforeDraw( ID3D11DeviceContext* context, UINT VertexCount, UINT StartVertexLocation );
 	void BeforeOMSetBlendState( ID3D11DeviceContext* context, ID3D11BlendState* pBlendState );
+	void BeforeOMSetRenderTargets( ID3D11DeviceContext* context, UINT NumViews, ID3D11RenderTargetView* const* ppRenderTargetViews, ID3D11DepthStencilView* pDepthStencilView );
 
 private:
+	void DrawColorFilter( ID3D11DeviceContext* context, const ComPtr<ID3D11Resource>& target );
 	void CreatePersistentData();
 
 	enum class State
@@ -73,6 +75,7 @@ private:
 		ComPtr<ID3D11RasterizerState> m_rasterizerState;
 		ComPtr<ID3D11BlendState> m_blendState;
 		std::tuple< ComPtr<ID3D11Buffer>, UINT, UINT, UINT > m_vertexBuffer; // Buffer, Stride, Offset, StartLocation
+		ComPtr<ID3D11RenderTargetView> m_lastUnboundRTV; // We might need to re-bind an unbound RTV
 	};
 
 	std::optional<PersistentData> m_persistentData;
