@@ -288,7 +288,7 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
             constexpr float DIST_FROM_CORNER = 20.0f;
             const ImVec2 window_pos = ImVec2(io.DisplaySize.x - DIST_FROM_CORNER, DIST_FROM_CORNER);
             ImGui::SetNextWindowPos(window_pos, ImGuiCond_Once, ImVec2(1.0f, 0.0f));
-            if ( ImGui::Begin( "DXHRDC-GFX Settings", &SETTINGS.isShown, ImGuiWindowFlags_NoResize|ImGuiWindowFlags_NoCollapse ) )
+            if ( ImGui::Begin( "DXHRDC-GFX Settings", &SETTINGS.isShown, ImGuiWindowFlags_NoCollapse ) )
             {
                 int id = 0;
 
@@ -306,6 +306,43 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
                 ImGui::RadioButton("DX:HR DC (Fixed)", &SETTINGS.lightingType, 1); ImGui::SameLine();
                 ImGui::RadioButton("DX:HR DC", &SETTINGS.lightingType, 0);
                 ImGui::PopID();
+
+                ImGui::Separator();
+
+                ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.45f);
+                SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Intensity", &SETTINGS.colorGradingAttributes[0][0], 0.005f, 0.0f, FLT_MAX );
+                SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Saturation", &SETTINGS.colorGradingAttributes[0][1], 0.005f, 0.0f, FLT_MAX );
+                SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Temp. threshold", &SETTINGS.colorGradingAttributes[0][2], 0.005f, 0.0f, FLT_MAX );
+                ImGui::PopItemWidth();
+                
+
+                ImGui::NewLine();
+                SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Cold", SETTINGS.colorGradingAttributes[1] );
+                SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Moderate", SETTINGS.colorGradingAttributes[2] );
+                SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Warm", SETTINGS.colorGradingAttributes[3] );
+                if ( ImGui::Button( "Restore defaults##Colors" ) )
+                {
+                    const float defaults[][4] = {
+                        { 0.85f,  0.75f,  1.25f },
+		                { 0.25098f,  0.31373f,  0.28235f },
+		                { 0.60392f,  0.52627f,  0.4098f },
+		                { 0.52941f,  0.52941f,  0.52941f }
+                    };
+                    memcpy( &SETTINGS.colorGradingAttributes[0], defaults, sizeof(defaults) );
+                    SETTINGS.colorGradingDirty = true;
+                }
+
+                ImGui::NewLine();
+                SETTINGS.colorGradingDirty |= ImGui::DragFloat4( "Vignette", SETTINGS.colorGradingAttributes[4], 0.05f, 0.0f, FLT_MAX, "%.2f" );
+                if ( ImGui::Button( "Restore defaults##Vignette" ) )
+                {
+                    const float defaults[][4] = {
+                        { 1.0f,  0.0f,  0.7f,  0.7f }
+                    };
+                    memcpy( &SETTINGS.colorGradingAttributes[4], defaults, sizeof(defaults) );
+                    SETTINGS.colorGradingDirty = true;
+                }
+
             }
 
             ImGui::End();

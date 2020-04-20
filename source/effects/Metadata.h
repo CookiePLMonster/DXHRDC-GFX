@@ -36,11 +36,21 @@ struct Settings
 {
 	// Those don't save
 	bool isShown = false;
+	bool colorGradingDirty = true;
 
 	// Those save
 	bool colorGradingEnabled = true;
 	int bloomType = 1; // 0 - stock, 1 - DXHR
 	int lightingType = 2; // 0 - stock, 1 - stock fixed, 2 - DXHR
+
+	float colorGradingAttributes[5][4] = {
+		// Those are duplicated in imgui code too
+		{ 0.85f,  0.75f,  1.25f },
+		{ 0.25098f,  0.31373f,  0.28235f },
+		{ 0.60392f,  0.52627f,  0.4098f },
+		{ 0.52941f,  0.52941f,  0.52941f },
+		{ 1.0f,  0.0f,  0.7f,  0.7f }
+	};
 };
 
 extern Settings SETTINGS;
