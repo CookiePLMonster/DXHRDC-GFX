@@ -55,4 +55,9 @@ struct Settings
 
 extern Settings SETTINGS;
 
+// Color grading presets
+extern const float COLOR_GRADING_PRESETS[3][4][4];
+
+int GetSelectedPreset( float attribs[4][4] );
+
 };

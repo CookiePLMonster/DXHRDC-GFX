@@ -15,36 +15,33 @@ extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg
 namespace UI
 {
 
-static bool hasImGuiContext = false;
+static bool imguiInitialized = false;
 static WNDPROC orgWndProc;
 LRESULT WINAPI UIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 {
-    if ( hasImGuiContext )
+    LRESULT imguiResult = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+    if ( imguiResult != 0 ) return imguiResult;
+
+    const ImGuiIO& io = ImGui::GetIO();
+    const bool captureMouse = io.WantCaptureMouse || io.MouseDrawCursor;
+    const bool captureKeyboard = io.WantCaptureKeyboard;
+    if ( captureMouse || captureKeyboard )
     {
-        LRESULT imguiResult = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
-        if ( imguiResult != 0 ) return imguiResult;
+        if ( captureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
+        if ( captureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
 
-        const ImGuiIO& io = ImGui::GetIO();
-        const bool captureMouse = io.WantCaptureMouse || io.MouseDrawCursor;
-        const bool captureKeyboard = io.WantCaptureKeyboard;
-        if ( captureMouse || captureKeyboard )
+        // Filter Raw Input
+        if ( msg == WM_INPUT )
         {
-            if ( captureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
-            if ( captureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
+            RAWINPUTHEADER header;
+            UINT size = sizeof(header);
 
-            // Filter Raw Input
-            if ( msg == WM_INPUT )
+            if ( GetRawInputData( reinterpret_cast<HRAWINPUT >(lParam), RID_HEADER, &header, &size, sizeof(RAWINPUTHEADER) ) != -1 )
             {
-                RAWINPUTHEADER header;
-                UINT size = sizeof(header);
-
-                if ( GetRawInputData( reinterpret_cast<HRAWINPUT >(lParam), RID_HEADER, &header, &size, sizeof(RAWINPUTHEADER) ) != -1 )
+                if ( (captureMouse && header.dwType == RIM_TYPEMOUSE) || (captureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
                 {
-                    if ( (captureMouse && header.dwType == RIM_TYPEMOUSE) || (captureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
-                    {
-                        // Let the OS perform cleanup
-                        return DefWindowProc(hWnd, msg, wParam, lParam);
-                    }
+                    // Let the OS perform cleanup
+                    return DefWindowProc(hWnd, msg, wParam, lParam);
                 }
             }
         }
@@ -180,16 +177,25 @@ HRESULT STDMETHODCALLTYPE DXGIFactory::GetUnderlyingInterface(REFIID riid, void*
 DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactory> factory, ComPtr<IUnknown> device, const DXGI_SWAP_CHAIN_DESC* desc)
     : m_factory( std::move(factory) ), m_device( std::move(device) ), m_orig( std::move(swapChain) )
 {
-    // We set up Dear Imgui in swapchain constructor and tear it down in the destructor
-    IMGUI_CHECKVERSION();
-    ImGui::CreateContext();
-    UI::hasImGuiContext = true;
+    // We set up Dear Imgui in swapchain constructor, don't tear it down as it's pointless
+    if ( !std::exchange(UI::imguiInitialized, true) )
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
 
-    ImGuiIO& io = ImGui::GetIO();
-    io.IniFilename = nullptr;
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = nullptr;
 
-    // Setup Dear ImGui style
-    ImGui::StyleColorsDark();
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+
+        // Hook into the window proc (only once per session)
+        if ( UI::orgWndProc == nullptr )
+        {
+            UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
+            SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
+        }
+    }
 
     // Setup Platform/Renderer bindings
     ImGui_ImplWin32_Init(desc->OutputWindow);
@@ -203,13 +209,6 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
         ImGui_ImplDX11_Init(d3dDevice.Get(), d3dDeviceContext.Get()); // Init holds a reference to both
     }
 
-    // Hook into the window proc (only once per session)
-    if ( UI::orgWndProc == nullptr )
-    {
-        UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
-        SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
-    }
-
     // Immediately start a new frame - we'll be starting new frames after each Present
     ImGui_ImplDX11_NewFrame();
     ImGui_ImplWin32_NewFrame();
@@ -218,11 +217,10 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
 
 DXGISwapChain::~DXGISwapChain()
 {
+    ImGui::EndFrame();
+
     ImGui_ImplDX11_Shutdown();
     ImGui_ImplWin32_Shutdown();
-
-    UI::hasImGuiContext = false;
-    ImGui::DestroyContext();
 }
 
 HRESULT STDMETHODCALLTYPE DXGISwapChain::QueryInterface(REFIID riid, void** ppvObject)
@@ -288,7 +286,7 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
             constexpr float DIST_FROM_CORNER = 20.0f;
             const ImVec2 window_pos = ImVec2(io.DisplaySize.x - DIST_FROM_CORNER, DIST_FROM_CORNER);
             ImGui::SetNextWindowPos(window_pos, ImGuiCond_Once, ImVec2(1.0f, 0.0f));
-            if ( ImGui::Begin( "DXHRDC-GFX Settings", &SETTINGS.isShown, ImGuiWindowFlags_NoCollapse ) )
+            if ( ImGui::Begin( "DXHRDC-GFX Settings", &SETTINGS.isShown, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysVerticalScrollbar ) )
             {
                 int id = 0;
 
@@ -309,38 +307,60 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
 
                 ImGui::Separator();
 
-                ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.45f);
-                SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Intensity", &SETTINGS.colorGradingAttributes[0][0], 0.005f, 0.0f, FLT_MAX );
-                SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Saturation", &SETTINGS.colorGradingAttributes[0][1], 0.005f, 0.0f, FLT_MAX );
-                SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Temp. threshold", &SETTINGS.colorGradingAttributes[0][2], 0.005f, 0.0f, FLT_MAX );
-                ImGui::PopItemWidth();
+                if ( SETTINGS.colorGradingEnabled )
+                {
+                    ImGui::Text( "Gold Filter Settings:" );
+
+                    // Presets
+                    const int curPreset = GetSelectedPreset( SETTINGS.colorGradingAttributes );
+
+                    const int numPresets = _countof( COLOR_GRADING_PRESETS );
+                    for ( int i = 0; i < numPresets; i++ )
+                    {
+                        char buf[16];
+                        sprintf_s( buf, "Preset %u", i + 1 );
+                        if ( ImGui::RadioButton( buf, curPreset == i ) )
+                        {
+                            memcpy( &SETTINGS.colorGradingAttributes[0], COLOR_GRADING_PRESETS[i], sizeof(COLOR_GRADING_PRESETS[i]) );
+                            SETTINGS.colorGradingDirty = true;                      
+                        }
+                        ImGui::SameLine();
+                    }
+                    ImGui::NewLine();
+                    ImGui::RadioButton( "Custom", curPreset == -1 );
+
+                    if ( ImGui::CollapsingHeader( "Advanced settings" ) )
+                    {
+                        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.45f);
+                        SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Intensity", &SETTINGS.colorGradingAttributes[0][0], 0.005f, 0.0f, FLT_MAX );
+                        SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Saturation", &SETTINGS.colorGradingAttributes[0][1], 0.005f, 0.0f, FLT_MAX );
+                        SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Temp. threshold", &SETTINGS.colorGradingAttributes[0][2], 0.005f, 0.0f, FLT_MAX );
+                        ImGui::PopItemWidth();
                 
 
-                ImGui::NewLine();
-                SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Cold", SETTINGS.colorGradingAttributes[1] );
-                SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Moderate", SETTINGS.colorGradingAttributes[2] );
-                SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Warm", SETTINGS.colorGradingAttributes[3] );
-                if ( ImGui::Button( "Restore defaults##Colors" ) )
-                {
-                    const float defaults[][4] = {
-                        { 0.85f,  0.75f,  1.25f },
-		                { 0.25098f,  0.31373f,  0.28235f },
-		                { 0.60392f,  0.52627f,  0.4098f },
-		                { 0.52941f,  0.52941f,  0.52941f }
-                    };
-                    memcpy( &SETTINGS.colorGradingAttributes[0], defaults, sizeof(defaults) );
-                    SETTINGS.colorGradingDirty = true;
-                }
+                        ImGui::NewLine();
+                        SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Cold", SETTINGS.colorGradingAttributes[1] );
+                        SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Moderate", SETTINGS.colorGradingAttributes[2] );
+                        SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Warm", SETTINGS.colorGradingAttributes[3] );
+                        if ( ImGui::Button( "Restore defaults##Colors" ) )
+                        {
+                            memcpy( &SETTINGS.colorGradingAttributes[0], COLOR_GRADING_PRESETS[0], sizeof(COLOR_GRADING_PRESETS[0]) );
+                            SETTINGS.colorGradingDirty = true;
+                        }
 
-                ImGui::NewLine();
-                SETTINGS.colorGradingDirty |= ImGui::DragFloat4( "Vignette", SETTINGS.colorGradingAttributes[4], 0.05f, 0.0f, FLT_MAX, "%.2f" );
-                if ( ImGui::Button( "Restore defaults##Vignette" ) )
-                {
-                    const float defaults[][4] = {
-                        { 1.0f,  0.0f,  0.7f,  0.7f }
-                    };
-                    memcpy( &SETTINGS.colorGradingAttributes[4], defaults, sizeof(defaults) );
-                    SETTINGS.colorGradingDirty = true;
+                        ImGui::NewLine();
+                        SETTINGS.colorGradingDirty |= ImGui::DragFloat4( "Vignette", SETTINGS.colorGradingAttributes[4], 0.05f, 0.0f, FLT_MAX, "%.2f" );
+                        if ( ImGui::Button( "Restore defaults##Vignette" ) )
+                        {
+                            const float defaults[][4] = {
+                                { 1.0f,  0.0f,  0.7f,  0.7f }
+                            };
+                            memcpy( &SETTINGS.colorGradingAttributes[4], defaults, sizeof(defaults) );
+                            SETTINGS.colorGradingDirty = true;
+                        }
+                    }
+
+                    ImGui::Dummy( ImVec2(0.0f, 20.0f) );
                 }
 
             }
