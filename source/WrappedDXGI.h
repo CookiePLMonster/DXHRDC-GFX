@@ -36,6 +36,6 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE GetUnderlyingInterface(REFIID riid, void** ppvObject) override;
 
 private:
-	wil::unique_hmodule m_dxgiModule;
+	SafeUniqueHmodule m_dxgiModule;
     ComPtr<IDXGIFactory> m_orig;
 };

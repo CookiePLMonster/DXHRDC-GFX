@@ -31,7 +31,7 @@ HRESULT WINAPI CreateDXGIFactory_Export( REFIID riid, void** ppFactory )
 // ====================================================
 
 DXGIFactory::DXGIFactory(wil::unique_hmodule module, ComPtr<IDXGIFactory> factory)
-    : m_dxgiModule( std::move(module) ), m_orig( std::move(factory) )
+    : m_dxgiModule( std::move(module), factory ), m_orig( std::move(factory) )
 {
 }
 

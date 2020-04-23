@@ -93,7 +93,7 @@ public:
     Effects::Lighting& GetLighting() { return m_lighting; }
 
 private:
-    wil::unique_hmodule m_d3dModule;
+    SafeUniqueHmodule m_d3dModule;
     ComPtr<ID3D11Device> m_orig;
     ComPtr<IDXGIDevice1> m_origDxgi;
 

@@ -40,7 +40,7 @@ HRESULT WINAPI D3D11CreateDevice_Export( IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE
 // ====================================================
 
 D3D11Device::D3D11Device(wil::unique_hmodule module, ComPtr<ID3D11Device> device, ComPtr<ID3D11DeviceContext> immediateContext)
-    : m_d3dModule( std::move(module) ), m_orig( std::move(device) ),
+    : m_d3dModule( std::move(module), device ), m_orig( std::move(device) ),
       m_colorGrading( this ), m_bloom( this ), m_lighting( this )
 {
     m_orig.As(&m_origDxgi);
