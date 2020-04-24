@@ -47,6 +47,8 @@ D3D11Device::D3D11Device(wil::unique_hmodule module, ComPtr<ID3D11Device> device
 
     ComPtr<D3D11DeviceContext> context = Make<D3D11DeviceContext>( std::move(immediateContext), this );
     m_immediateContext = context.Detach();
+
+    Effects::LoadSettings();
 }
 
 ULONG STDMETHODCALLTYPE D3D11Device::Release()

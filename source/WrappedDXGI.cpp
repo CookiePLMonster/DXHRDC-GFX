@@ -189,12 +189,9 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
         // Setup Dear ImGui style
         ImGui::StyleColorsDark();
 
-        // Hook into the window proc (only once per session)
-        if ( UI::orgWndProc == nullptr )
-        {
-            UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
-            SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
-        }
+        // Hook into the window proc
+        UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
+        SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
     }
 
     // Setup Platform/Renderer bindings
@@ -288,27 +285,31 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
             ImGui::SetNextWindowPos(window_pos, ImGuiCond_Once, ImVec2(1.0f, 0.0f));
             if ( ImGui::Begin( "DXHRDC-GFX Settings", &SETTINGS.isShown, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysVerticalScrollbar ) )
             {
+                bool needsToSave = false;
+
                 int id = 0;
 
-                ImGui::Checkbox("Enable Gold Filter", &SETTINGS.colorGradingEnabled);
+                needsToSave |= ImGui::Checkbox("Enable Gold Filter", &SETTINGS.colorGradingEnabled);
 
                 ImGui::PushID(id++);
                 ImGui::Text( "Bloom Style" );
-                ImGui::RadioButton("DX:HR", &SETTINGS.bloomType, 1); ImGui::SameLine();
-                ImGui::RadioButton("DX:HR DC", &SETTINGS.bloomType, 0);
+                needsToSave |= ImGui::RadioButton("DX:HR", &SETTINGS.bloomType, 1); ImGui::SameLine();
+                needsToSave |= ImGui::RadioButton("DX:HR DC", &SETTINGS.bloomType, 0);
                 ImGui::PopID();
 
                 ImGui::PushID(id++);
                 ImGui::Text( "Lighting Style" );
-                ImGui::RadioButton("DX:HR", &SETTINGS.lightingType, 2);
-                ImGui::RadioButton("DX:HR DC (Fixed)", &SETTINGS.lightingType, 1); ImGui::SameLine();
-                ImGui::RadioButton("DX:HR DC", &SETTINGS.lightingType, 0);
+                needsToSave |= ImGui::RadioButton("DX:HR", &SETTINGS.lightingType, 2);
+                needsToSave |= ImGui::RadioButton("DX:HR DC (Fixed)", &SETTINGS.lightingType, 1); ImGui::SameLine();
+                needsToSave |= ImGui::RadioButton("DX:HR DC", &SETTINGS.lightingType, 0);
                 ImGui::PopID();
 
                 ImGui::Separator();
 
                 if ( SETTINGS.colorGradingEnabled )
                 {
+                    bool colorGradingDirty = false;
+
                     ImGui::Text( "Gold Filter Settings:" );
 
                     // Presets
@@ -322,7 +323,7 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
                         if ( ImGui::RadioButton( buf, curPreset == i ) )
                         {
                             memcpy( &SETTINGS.colorGradingAttributes[0], COLOR_GRADING_PRESETS[i], sizeof(COLOR_GRADING_PRESETS[i]) );
-                            SETTINGS.colorGradingDirty = true;                      
+                            colorGradingDirty = true;                      
                         }
                         ImGui::SameLine();
                     }
@@ -332,32 +333,37 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
                     if ( ImGui::CollapsingHeader( "Advanced settings" ) )
                     {
                         ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.45f);
-                        SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Intensity", &SETTINGS.colorGradingAttributes[0][0], 0.005f, 0.0f, FLT_MAX );
-                        SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Saturation", &SETTINGS.colorGradingAttributes[0][1], 0.005f, 0.0f, FLT_MAX );
-                        SETTINGS.colorGradingDirty |= ImGui::DragFloat( "Temp. threshold", &SETTINGS.colorGradingAttributes[0][2], 0.005f, 0.0f, FLT_MAX );
+                        colorGradingDirty |= ImGui::DragFloat( "Intensity", &SETTINGS.colorGradingAttributes[0][0], 0.005f, 0.0f, FLT_MAX );
+                        colorGradingDirty |= ImGui::DragFloat( "Saturation", &SETTINGS.colorGradingAttributes[0][1], 0.005f, 0.0f, FLT_MAX );
+                        colorGradingDirty |= ImGui::DragFloat( "Temp. threshold", &SETTINGS.colorGradingAttributes[0][2], 0.005f, 0.0f, FLT_MAX );
                         ImGui::PopItemWidth();
                 
 
                         ImGui::NewLine();
-                        SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Cold", SETTINGS.colorGradingAttributes[1] );
-                        SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Moderate", SETTINGS.colorGradingAttributes[2] );
-                        SETTINGS.colorGradingDirty |= ImGui::ColorEdit3( "Warm", SETTINGS.colorGradingAttributes[3] );
+                        colorGradingDirty |= ImGui::ColorEdit3( "Cold", SETTINGS.colorGradingAttributes[1] );
+                        colorGradingDirty |= ImGui::ColorEdit3( "Moderate", SETTINGS.colorGradingAttributes[2] );
+                        colorGradingDirty |= ImGui::ColorEdit3( "Warm", SETTINGS.colorGradingAttributes[3] );
                         if ( ImGui::Button( "Restore defaults##Colors" ) )
                         {
                             memcpy( &SETTINGS.colorGradingAttributes[0], COLOR_GRADING_PRESETS[0], sizeof(COLOR_GRADING_PRESETS[0]) );
-                            SETTINGS.colorGradingDirty = true;
+                            colorGradingDirty = true;
                         }
 
                         ImGui::NewLine();
-                        SETTINGS.colorGradingDirty |= ImGui::DragFloat4( "Vignette", SETTINGS.colorGradingAttributes[4], 0.05f, 0.0f, FLT_MAX, "%.2f" );
+                        colorGradingDirty |= ImGui::DragFloat4( "Vignette", SETTINGS.colorGradingAttributes[4], 0.05f, 0.0f, FLT_MAX, "%.2f" );
                         if ( ImGui::Button( "Restore defaults##Vignette" ) )
                         {
-                            const float defaults[][4] = {
-                                { 1.0f,  0.0f,  0.7f,  0.7f }
-                            };
-                            memcpy( &SETTINGS.colorGradingAttributes[4], defaults, sizeof(defaults) );
-                            SETTINGS.colorGradingDirty = true;
+                            memcpy( &SETTINGS.colorGradingAttributes[4], Effects::VIGNETTE_PRESET, sizeof(Effects::VIGNETTE_PRESET) );
+                            colorGradingDirty = true;
                         }
+                    }
+
+                    SETTINGS.colorGradingDirty |= colorGradingDirty;
+                    needsToSave |= colorGradingDirty;
+
+                    if ( needsToSave )
+                    {
+                        SaveSettings();
                     }
 
                     ImGui::Dummy( ImVec2(0.0f, 20.0f) );

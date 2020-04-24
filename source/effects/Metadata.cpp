@@ -1,6 +1,10 @@
 #include <Windows.h>
 #include "Metadata.h"
 
+#include <stdio.h>
+
+extern wchar_t wcModulePath[MAX_PATH];
+
 Effects::Settings Effects::SETTINGS;
 
 const float Effects::COLOR_GRADING_PRESETS[3][4][4] = {
@@ -26,6 +30,8 @@ const float Effects::COLOR_GRADING_PRESETS[3][4][4] = {
 	},
 };
 
+const float Effects::VIGNETTE_PRESET[4] = { 1.0f,  0.0f,  0.7f,  0.7f };
+
 int Effects::GetSelectedPreset( float attribs[4][4] )
 {
 	const int numPresets = _countof( COLOR_GRADING_PRESETS );
@@ -38,4 +44,48 @@ int Effects::GetSelectedPreset( float attribs[4][4] )
 	}
 
 	return -1;
+}
+
+void Effects::SaveSettings()
+{
+	wchar_t buffer[16];
+
+	// Basic
+	swprintf_s( buffer, L"%d", SETTINGS.colorGradingEnabled );
+	WritePrivateProfileStringW( L"Basic", L"EnableColorGrading", buffer, wcModulePath );
+
+	swprintf_s( buffer, L"%d", SETTINGS.bloomType );
+	WritePrivateProfileStringW( L"Basic", L"BloomStyle", buffer, wcModulePath );
+
+	swprintf_s( buffer, L"%d", SETTINGS.lightingType );
+	WritePrivateProfileStringW( L"Basic", L"LightingStyle", buffer, wcModulePath );
+
+	// Advanced
+	WritePrivateProfileStructW( L"Advanced", L"Attribs", &SETTINGS.colorGradingAttributes[0], sizeof(float) * 3, wcModulePath );
+	WritePrivateProfileStructW( L"Advanced", L"Color1", &SETTINGS.colorGradingAttributes[1], sizeof(float) * 3, wcModulePath );
+	WritePrivateProfileStructW( L"Advanced", L"Color2", &SETTINGS.colorGradingAttributes[2], sizeof(float) * 3, wcModulePath );
+	WritePrivateProfileStructW( L"Advanced", L"Color3", &SETTINGS.colorGradingAttributes[3], sizeof(float) * 3, wcModulePath );
+	WritePrivateProfileStructW( L"Advanced", L"Vignette", &SETTINGS.colorGradingAttributes[4], sizeof(float) * 4, wcModulePath );
+}
+
+void Effects::LoadSettings()
+{
+	SETTINGS.colorGradingEnabled = GetPrivateProfileIntW( L"Basic", L"EnableColorGrading", 1, wcModulePath );
+	SETTINGS.bloomType = GetPrivateProfileIntW( L"Basic", L"BloomStyle", 1, wcModulePath );
+	SETTINGS.lightingType = GetPrivateProfileIntW( L"Basic", L"LightingStyle", 1, wcModulePath );
+
+	// If color grading fails to load, reset it all, but leave vignette separate
+	if ( 
+		GetPrivateProfileStructW( L"Advanced", L"Attribs", &SETTINGS.colorGradingAttributes[0], sizeof(float) * 3, wcModulePath ) == FALSE ||
+		GetPrivateProfileStructW( L"Advanced", L"Color1", &SETTINGS.colorGradingAttributes[1], sizeof(float) * 3, wcModulePath ) == FALSE ||
+		GetPrivateProfileStructW( L"Advanced", L"Color2", &SETTINGS.colorGradingAttributes[2], sizeof(float) * 3, wcModulePath ) == FALSE ||
+		GetPrivateProfileStructW( L"Advanced", L"Color3", &SETTINGS.colorGradingAttributes[3], sizeof(float) * 3, wcModulePath ) == FALSE )
+	{
+		memcpy( &SETTINGS.colorGradingAttributes[0], COLOR_GRADING_PRESETS[0], sizeof(COLOR_GRADING_PRESETS[0]) );
+	}
+
+	if ( GetPrivateProfileStructW( L"Advanced", L"Vignette", &SETTINGS.colorGradingAttributes[4], sizeof(float) * 4, wcModulePath ) == FALSE )
+	{
+		memcpy( &SETTINGS.colorGradingAttributes[4], Effects::VIGNETTE_PRESET, sizeof(Effects::VIGNETTE_PRESET) );
+	}
 }
