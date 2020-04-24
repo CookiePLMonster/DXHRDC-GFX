@@ -25,7 +25,7 @@ void Effects::ColorGrading::AnnotatePixelShader(ID3D11PixelShader* shader, const
 
 void Effects::ColorGrading::OnPixelShaderSet(ID3D11PixelShader* shader)
 {
-	if ( KeyToggled(VK_F2) == 0 ) return;
+	if ( !SETTINGS.colorGradingEnabled ) return;
 
 	ResourceMetadata meta;
 	UINT size = sizeof(meta);
@@ -196,6 +196,19 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 	context->PSSetConstantBuffers( 5, 1, m_persistentData->m_constantBuffer.GetAddressOf() );
 	context->PSSetShaderResources( 0, 1, m_persistentData->m_lastOutputSRV.GetAddressOf() );
 
+	if ( std::exchange(SETTINGS.colorGradingDirty, false) )
+	{
+		ComPtr<ID3D11Resource> cbResource;
+		m_persistentData->m_constantBuffer.As(&cbResource);
+
+		D3D11_MAPPED_SUBRESOURCE mapped;
+		if ( SUCCEEDED(context->Map( cbResource.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped )) )
+		{
+			memcpy( mapped.pData, SETTINGS.colorGradingAttributes, sizeof(SETTINGS.colorGradingAttributes) );
+			context->Unmap( cbResource.Get(), 0 );
+		}
+	}
+
 	context->Draw( 6, std::get<3>(m_volatileData->m_vertexBuffer) );
 	context->CopyResource( target.Get(), std::get<0>(m_persistentData->m_tempRT).Get() );
 
@@ -208,20 +221,11 @@ void Effects::ColorGrading::CreatePersistentData()
 
 	m_device->CreatePixelShader( COLOR_GRADING_PS_BYTECODE, sizeof(COLOR_GRADING_PS_BYTECODE), nullptr, m_persistentData->m_pixelShader.GetAddressOf() );
 
-	static const float colorCorrection[32] = {
-		0.85f,  0.75f,  1.25f,  0.0f,
-		0.25098f,  0.31373f,  0.28235f,  1.0f,
-		0.60392f,  0.52627f,  0.4098f,  1.1f,
-		0.52941f,  0.52941f,  0.52941f,  1.0f,
-		1.0f,  0.0f,  0.7f,  0.7f,
-	};
-
 	D3D11_BUFFER_DESC cbDesc {};
-	cbDesc.ByteWidth = sizeof(colorCorrection);
-	cbDesc.Usage = D3D11_USAGE_IMMUTABLE;
+	cbDesc.ByteWidth = 512;
+	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
 	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
 
-	D3D11_SUBRESOURCE_DATA initialData {};
-	initialData.pSysMem = colorCorrection;
-	m_device->CreateBuffer( &cbDesc, &initialData, m_persistentData->m_constantBuffer.GetAddressOf() );
+	m_device->CreateBuffer( &cbDesc, nullptr, m_persistentData->m_constantBuffer.GetAddressOf() );
 }

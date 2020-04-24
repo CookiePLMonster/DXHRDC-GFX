@@ -31,7 +31,30 @@ static const GUID GUID_AlternateResource =
 	{ 0x2bbe62d5, 0xab9d, 0x47b1, { 0xae, 0xd2, 0xf4, 0xc, 0x37, 0x5b, 0xdd, 0xf } };
 
 
-// Debug toggle for effects
-int KeyToggled(int vk, int min = 0, int max = 1);
+// Global options, controlled by UI and mostly saved to INI
+struct Settings
+{
+	// Those don't save
+	bool isShown = false;
+	bool colorGradingDirty = true;
+
+	// Those save
+	bool colorGradingEnabled;
+	int bloomType; // 0 - stock, 1 - DXHR
+	int lightingType; // 0 - stock, 1 - stock fixed, 2 - DXHR
+
+	float colorGradingAttributes[5][4] {};
+};
+
+extern Settings SETTINGS;
+
+// Color grading presets
+extern const float COLOR_GRADING_PRESETS[3][4][4];
+extern const float VIGNETTE_PRESET[4];
+
+int GetSelectedPreset( float attribs[4][4] );
+
+void SaveSettings();
+void LoadSettings();
 
 };

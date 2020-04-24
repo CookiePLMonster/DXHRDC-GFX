@@ -1,7 +1,56 @@
 #include "WrappedDXGI.h"
 
 #include <utility>
+#include <d3d11.h>
 
+#include "imgui/imgui.h"
+#include "imgui/imgui_impl_win32.h"
+#include "imgui/imgui_impl_dx11.h"
+
+#include "effects/Metadata.h"
+
+extern IMGUI_IMPL_API LRESULT ImGui_ImplWin32_WndProcHandler(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam);
+
+// Functions specific to ImGui
+namespace UI
+{
+
+static bool imguiInitialized = false;
+static WNDPROC orgWndProc;
+LRESULT WINAPI UIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
+{
+    LRESULT imguiResult = ImGui_ImplWin32_WndProcHandler(hWnd, msg, wParam, lParam);
+    if ( imguiResult != 0 ) return imguiResult;
+
+    const ImGuiIO& io = ImGui::GetIO();
+    const bool captureMouse = io.WantCaptureMouse || io.MouseDrawCursor;
+    const bool captureKeyboard = io.WantCaptureKeyboard;
+    if ( captureMouse || captureKeyboard )
+    {
+        if ( captureMouse && (msg >= WM_MOUSEFIRST && msg <= WM_MOUSELAST) ) return imguiResult;
+        if ( captureKeyboard && (msg >= WM_KEYFIRST && msg <= WM_KEYLAST) ) return imguiResult;
+
+        // Filter Raw Input
+        if ( msg == WM_INPUT )
+        {
+            RAWINPUTHEADER header;
+            UINT size = sizeof(header);
+
+            if ( GetRawInputData( reinterpret_cast<HRAWINPUT >(lParam), RID_HEADER, &header, &size, sizeof(RAWINPUTHEADER) ) != -1 )
+            {
+                if ( (captureMouse && header.dwType == RIM_TYPEMOUSE) || (captureKeyboard && header.dwType == RIM_TYPEKEYBOARD) )
+                {
+                    // Let the OS perform cleanup
+                    return DefWindowProc(hWnd, msg, wParam, lParam);
+                }
+            }
+        }
+    }
+
+    return CallWindowProc(orgWndProc, hWnd, msg, wParam, lParam);
+}
+
+}
 
 HRESULT WINAPI CreateDXGIFactory_Export( REFIID riid, void** ppFactory )
 {
@@ -82,7 +131,12 @@ HRESULT STDMETHODCALLTYPE DXGIFactory::GetWindowAssociation(HWND* pWindowHandle)
 
 HRESULT STDMETHODCALLTYPE DXGIFactory::CreateSwapChain(IUnknown* pDevice, DXGI_SWAP_CHAIN_DESC* pDesc, IDXGISwapChain** ppSwapChain)
 {
-    if ( pDevice == nullptr ) return DXGI_ERROR_INVALID_CALL;
+    if ( pDevice == nullptr || pDesc == nullptr || ppSwapChain == nullptr ) return DXGI_ERROR_INVALID_CALL;
+    *ppSwapChain = nullptr;
+
+    ComPtr<IDXGISwapChain> swapChain;
+    HRESULT hr = S_OK;
+    bool created = false;
 
     ComPtr<IWrapperObject> wrapper;
     if ( SUCCEEDED(pDevice->QueryInterface(IID_PPV_ARGS(wrapper.GetAddressOf()))) )
@@ -90,11 +144,22 @@ HRESULT STDMETHODCALLTYPE DXGIFactory::CreateSwapChain(IUnknown* pDevice, DXGI_S
         ComPtr<IUnknown> underlyingInterface;
         if ( SUCCEEDED(wrapper->GetUnderlyingInterface(IID_PPV_ARGS(underlyingInterface.GetAddressOf()))) )
         {
-            return m_orig->CreateSwapChain(underlyingInterface.Get(), pDesc, ppSwapChain);
+            hr = m_orig->CreateSwapChain(underlyingInterface.Get(), pDesc, swapChain.GetAddressOf());
+            created = true;
         }
     }
 
-    return m_orig->CreateSwapChain(pDevice, pDesc, ppSwapChain);
+    if ( !created )
+    {
+        hr = m_orig->CreateSwapChain(pDevice, pDesc, swapChain.GetAddressOf());
+    }
+
+    if ( SUCCEEDED(hr) )
+    {
+        ComPtr<IDXGISwapChain> wrappedSwapChain = Make<DXGISwapChain>( std::move(swapChain), this, pDevice, pDesc );
+        *ppSwapChain = wrappedSwapChain.Detach();
+    }
+    return hr;
 }
 
 HRESULT STDMETHODCALLTYPE DXGIFactory::CreateSoftwareAdapter(HMODULE Module, IDXGIAdapter** ppAdapter)
@@ -105,4 +170,290 @@ HRESULT STDMETHODCALLTYPE DXGIFactory::CreateSoftwareAdapter(HMODULE Module, IDX
 HRESULT STDMETHODCALLTYPE DXGIFactory::GetUnderlyingInterface(REFIID riid, void** ppvObject)
 {
     return m_orig.CopyTo(riid, ppvObject);
+}
+
+// ====================================================
+
+DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactory> factory, ComPtr<IUnknown> device, const DXGI_SWAP_CHAIN_DESC* desc)
+    : m_factory( std::move(factory) ), m_device( std::move(device) ), m_orig( std::move(swapChain) )
+{
+    // We set up Dear Imgui in swapchain constructor, don't tear it down as it's pointless
+    if ( !std::exchange(UI::imguiInitialized, true) )
+    {
+        IMGUI_CHECKVERSION();
+        ImGui::CreateContext();
+
+        ImGuiIO& io = ImGui::GetIO();
+        io.IniFilename = nullptr;
+
+        // Setup Dear ImGui style
+        ImGui::StyleColorsDark();
+
+        // Hook into the window proc
+        UI::orgWndProc = reinterpret_cast<WNDPROC>(GetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC ));
+        SetWindowLongPtr( desc->OutputWindow, GWLP_WNDPROC, reinterpret_cast<LONG_PTR>(UI::UIWndProc) );
+    }
+
+    // Setup Platform/Renderer bindings
+    ImGui_ImplWin32_Init(desc->OutputWindow);
+
+    ComPtr<ID3D11Device> d3dDevice;
+    if ( SUCCEEDED(m_device.As(&d3dDevice)) )
+    {
+        ComPtr<ID3D11DeviceContext> d3dDeviceContext;
+        d3dDevice->GetImmediateContext( d3dDeviceContext.GetAddressOf() );
+
+        ImGui_ImplDX11_Init(d3dDevice.Get(), d3dDeviceContext.Get()); // Init holds a reference to both
+    }
+
+    // Immediately start a new frame - we'll be starting new frames after each Present
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+}
+
+DXGISwapChain::~DXGISwapChain()
+{
+    ImGui::EndFrame();
+
+    ImGui_ImplDX11_Shutdown();
+    ImGui_ImplWin32_Shutdown();
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::QueryInterface(REFIID riid, void** ppvObject)
+{
+    HRESULT hr = __super::QueryInterface(riid, ppvObject);
+    if ( FAILED(hr) )
+    {
+        hr = m_orig->QueryInterface(riid, ppvObject);
+    }
+    return hr;
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::SetPrivateData(REFGUID Name, UINT DataSize, const void* pData)
+{
+	return m_orig->SetPrivateData(Name, DataSize, pData);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::SetPrivateDataInterface(REFGUID Name, const IUnknown* pUnknown)
+{
+	return m_orig->SetPrivateDataInterface(Name, pUnknown);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetPrivateData(REFGUID Name, UINT* pDataSize, void* pData)
+{
+	return m_orig->GetPrivateData(Name, pDataSize, pData);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetParent(REFIID riid, void** ppParent)
+{
+	return m_factory.CopyTo(riid, ppParent);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetDevice(REFIID riid, void** ppDevice)
+{
+	return m_device.CopyTo(riid, ppDevice);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
+{
+    // Draw all UI widgets
+    {
+        using namespace Effects;
+
+        ImGuiIO& io = ImGui::GetIO();
+
+        static bool keyPressed = false;
+        if ( io.KeysDown[VK_F11] )
+        {
+            if ( !keyPressed )
+            {
+                SETTINGS.isShown = !SETTINGS.isShown;
+                keyPressed = true;
+            }
+        }
+        else
+        {
+            keyPressed = false;
+        }
+
+        if ( SETTINGS.isShown )
+        {
+            //ImGui::ShowDemoWindow();
+            constexpr float DIST_FROM_CORNER = 20.0f;
+            const ImVec2 window_pos = ImVec2(io.DisplaySize.x - DIST_FROM_CORNER, DIST_FROM_CORNER);
+            ImGui::SetNextWindowPos(window_pos, ImGuiCond_Once, ImVec2(1.0f, 0.0f));
+            if ( ImGui::Begin( "DXHRDC-GFX Settings", &SETTINGS.isShown, ImGuiWindowFlags_NoCollapse|ImGuiWindowFlags_AlwaysVerticalScrollbar ) )
+            {
+                bool needsToSave = false;
+
+                int id = 0;
+
+                needsToSave |= ImGui::Checkbox("Enable Gold Filter", &SETTINGS.colorGradingEnabled);
+
+                ImGui::PushID(id++);
+                ImGui::Text( "Bloom Style" );
+                needsToSave |= ImGui::RadioButton("DX:HR", &SETTINGS.bloomType, 1); ImGui::SameLine();
+                needsToSave |= ImGui::RadioButton("DX:HR DC", &SETTINGS.bloomType, 0);
+                ImGui::PopID();
+
+                ImGui::PushID(id++);
+                ImGui::Text( "Lighting Style" );
+                needsToSave |= ImGui::RadioButton("DX:HR", &SETTINGS.lightingType, 2);
+                needsToSave |= ImGui::RadioButton("DX:HR DC (Fixed)", &SETTINGS.lightingType, 1); ImGui::SameLine();
+                needsToSave |= ImGui::RadioButton("DX:HR DC", &SETTINGS.lightingType, 0);
+                ImGui::PopID();
+
+                ImGui::Separator();
+
+                if ( SETTINGS.colorGradingEnabled )
+                {
+                    bool colorGradingDirty = false;
+
+                    ImGui::Text( "Gold Filter Settings:" );
+
+                    // Presets
+                    const int curPreset = GetSelectedPreset( SETTINGS.colorGradingAttributes );
+
+                    const int numPresets = _countof( COLOR_GRADING_PRESETS );
+                    for ( int i = 0; i < numPresets; i++ )
+                    {
+                        char buf[16];
+                        sprintf_s( buf, "Preset %u", i + 1 );
+                        if ( ImGui::RadioButton( buf, curPreset == i ) )
+                        {
+                            memcpy( &SETTINGS.colorGradingAttributes[0], COLOR_GRADING_PRESETS[i], sizeof(COLOR_GRADING_PRESETS[i]) );
+                            colorGradingDirty = true;                      
+                        }
+                        ImGui::SameLine();
+                    }
+                    ImGui::NewLine();
+                    ImGui::RadioButton( "Custom", curPreset == -1 );
+
+                    if ( ImGui::CollapsingHeader( "Advanced settings" ) )
+                    {
+                        ImGui::PushItemWidth(ImGui::GetWindowWidth() * 0.45f);
+                        colorGradingDirty |= ImGui::DragFloat( "Intensity", &SETTINGS.colorGradingAttributes[0][0], 0.005f, 0.0f, FLT_MAX );
+                        colorGradingDirty |= ImGui::DragFloat( "Saturation", &SETTINGS.colorGradingAttributes[0][1], 0.005f, 0.0f, FLT_MAX );
+                        colorGradingDirty |= ImGui::DragFloat( "Temp. threshold", &SETTINGS.colorGradingAttributes[0][2], 0.005f, 0.0f, FLT_MAX );
+                        ImGui::PopItemWidth();
+                
+
+                        ImGui::NewLine();
+                        colorGradingDirty |= ImGui::ColorEdit3( "Cold", SETTINGS.colorGradingAttributes[1] );
+                        colorGradingDirty |= ImGui::ColorEdit3( "Moderate", SETTINGS.colorGradingAttributes[2] );
+                        colorGradingDirty |= ImGui::ColorEdit3( "Warm", SETTINGS.colorGradingAttributes[3] );
+                        if ( ImGui::Button( "Restore defaults##Colors" ) )
+                        {
+                            memcpy( &SETTINGS.colorGradingAttributes[0], COLOR_GRADING_PRESETS[0], sizeof(COLOR_GRADING_PRESETS[0]) );
+                            colorGradingDirty = true;
+                        }
+
+                        ImGui::NewLine();
+                        colorGradingDirty |= ImGui::DragFloat4( "Vignette", SETTINGS.colorGradingAttributes[4], 0.05f, 0.0f, FLT_MAX, "%.2f" );
+                        if ( ImGui::Button( "Restore defaults##Vignette" ) )
+                        {
+                            memcpy( &SETTINGS.colorGradingAttributes[4], Effects::VIGNETTE_PRESET, sizeof(Effects::VIGNETTE_PRESET) );
+                            colorGradingDirty = true;
+                        }
+                    }
+
+                    SETTINGS.colorGradingDirty |= colorGradingDirty;
+                    needsToSave |= colorGradingDirty;
+
+                    if ( needsToSave )
+                    {
+                        SaveSettings();
+                    }
+
+                    ImGui::Dummy( ImVec2(0.0f, 20.0f) );
+                }
+
+            }
+
+            ImGui::End();
+        }
+
+        io.MouseDrawCursor = SETTINGS.isShown;
+    }
+
+    ImGui::Render();
+
+    ImDrawData* drawData = ImGui::GetDrawData();
+    if ( drawData->TotalVtxCount > 0 )
+    {
+        // Only do this relatively heavy work if we actually render something
+        ComPtr<ID3D11Device> d3dDevice;
+        if ( SUCCEEDED(m_device.As(&d3dDevice)) )
+        {
+            ComPtr<ID3D11Resource> renderTarget;
+            if ( SUCCEEDED(GetBuffer(0, IID_PPV_ARGS(renderTarget.GetAddressOf())))  )
+            {
+                ComPtr<ID3D11RenderTargetView> rtv;
+                if ( SUCCEEDED(d3dDevice->CreateRenderTargetView( renderTarget.Get(), nullptr, rtv.GetAddressOf()) ) )
+                {
+                    ComPtr<ID3D11DeviceContext> d3dDeviceContext;
+                    d3dDevice->GetImmediateContext( d3dDeviceContext.GetAddressOf() );
+
+                    d3dDeviceContext->OMSetRenderTargets( 1, rtv.GetAddressOf(), nullptr );
+                }
+            }
+        }
+    }
+
+    ImGui_ImplDX11_RenderDrawData(drawData);
+
+    HRESULT hr = m_orig->Present(SyncInterval, Flags);
+
+    // Start the Dear ImGui frame
+    ImGui_ImplDX11_NewFrame();
+    ImGui_ImplWin32_NewFrame();
+    ImGui::NewFrame();
+
+    return hr;
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetBuffer(UINT Buffer, REFIID riid, void** ppSurface)
+{
+	return m_orig->GetBuffer(Buffer, riid, ppSurface);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::SetFullscreenState(BOOL Fullscreen, IDXGIOutput* pTarget)
+{
+	return m_orig->SetFullscreenState(Fullscreen, pTarget);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetFullscreenState(BOOL* pFullscreen, IDXGIOutput** ppTarget)
+{
+	return m_orig->GetFullscreenState(pFullscreen, ppTarget);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetDesc(DXGI_SWAP_CHAIN_DESC* pDesc)
+{
+	return m_orig->GetDesc(pDesc);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::ResizeBuffers(UINT BufferCount, UINT Width, UINT Height, DXGI_FORMAT NewFormat, UINT SwapChainFlags)
+{
+	return m_orig->ResizeBuffers(BufferCount, Width, Height, NewFormat, SwapChainFlags);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::ResizeTarget(const DXGI_MODE_DESC* pNewTargetParameters)
+{
+	return m_orig->ResizeTarget(pNewTargetParameters);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetContainingOutput(IDXGIOutput** ppOutput)
+{
+	return m_orig->GetContainingOutput(ppOutput);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetFrameStatistics(DXGI_FRAME_STATISTICS* pStats)
+{
+	return m_orig->GetFrameStatistics(pStats);
+}
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetLastPresentCount(UINT* pLastPresentCount)
+{
+	return m_orig->GetLastPresentCount(pLastPresentCount);
 }

@@ -47,6 +47,8 @@ D3D11Device::D3D11Device(wil::unique_hmodule module, ComPtr<ID3D11Device> device
 
     ComPtr<D3D11DeviceContext> context = Make<D3D11DeviceContext>( std::move(immediateContext), this );
     m_immediateContext = context.Detach();
+
+    Effects::LoadSettings();
 }
 
 ULONG STDMETHODCALLTYPE D3D11Device::Release()
@@ -332,7 +334,7 @@ HRESULT STDMETHODCALLTYPE D3D11Device::GetUnderlyingInterface(REFIID riid, void*
 
 // ====================================================
 
-inline D3D11DeviceContext::D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device)
+D3D11DeviceContext::D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device)
     : m_device(std::move(device)), m_orig(std::move(context))
 {
 }
