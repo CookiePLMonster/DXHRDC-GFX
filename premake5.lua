@@ -25,6 +25,9 @@ workspace "*"
 	-- Disable exceptions in WIL
 	defines { "WIL_SUPPRESS_EXCEPTIONS" }
 
+	-- Disable linking XInput in Dear ImGui
+	defines { "IMGUI_IMPL_WIN32_DISABLE_GAMEPAD" }
+
 	cppdialect "C++17"
 	staticruntime "on"
 	buildoptions { "/sdl" }
