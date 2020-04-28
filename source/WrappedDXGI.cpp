@@ -361,14 +361,13 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
                     SETTINGS.colorGradingDirty |= colorGradingDirty;
                     needsToSave |= colorGradingDirty;
 
-                    if ( needsToSave )
-                    {
-                        SaveSettings();
-                    }
-
                     ImGui::Dummy( ImVec2(0.0f, 20.0f) );
                 }
 
+                if ( needsToSave )
+                {
+                    SaveSettings();
+                }
             }
 
             ImGui::End();
