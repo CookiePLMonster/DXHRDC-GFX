@@ -16,6 +16,12 @@ HMODULE WINAPI LoadLibraryA_SelfReference( LPCSTR /*lpLibFileName*/ )
 }
 static auto* const pLoadLibraryA_SelfReference = LoadLibraryA_SelfReference;
 
+static HMODULE (WINAPI** orgLoadLibraryA)(LPCSTR);
+HMODULE WINAPI LoadLibraryA_DXHR( LPCSTR lpLibFileName )
+{
+	return std::invoke( *orgLoadLibraryA, lpLibFileName );
+}
+
 void OnInitializeHook()
 {
 	GetModuleFileNameW(hDLLModule, wcModulePath, _countof(wcModulePath) - 3); // Minus max required space for extension
@@ -27,6 +33,7 @@ void OnInitializeHook()
 	// Make the game use this module instead of dxgi.dll/d3d11.dll when asked for it
 	{
 		auto loadLibrary = get_pattern<decltype(LoadLibraryA_SelfReference)**>( "8B 3D ? ? ? ? 68 ? ? ? ? FF D7", 2 );
+		orgLoadLibraryA = *loadLibrary;
 		Patch( loadLibrary, &pLoadLibraryA_SelfReference );
 	}
 }

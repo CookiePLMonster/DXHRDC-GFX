@@ -2,6 +2,7 @@
 
 #include <utility>
 
+extern HMODULE WINAPI LoadLibraryA_DXHR( LPCSTR lpLibFileName );
 
 HRESULT WINAPI D3D11CreateDevice_Export( IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE DriverType, HMODULE Software, UINT Flags,
                         const D3D_FEATURE_LEVEL* pFeatureLevels, UINT FeatureLevels, UINT SDKVersion, ID3D11Device** ppDevice,
@@ -11,7 +12,7 @@ HRESULT WINAPI D3D11CreateDevice_Export( IDXGIAdapter* pAdapter, D3D_DRIVER_TYPE
     wil::assign_null_to_opt_param(ppImmediateContext);
 
     // Try to load a real d3d11.dll, D3D11Device will claim ownership of its reference if created successfully
-    wil::unique_hmodule d3dModule( LoadLibrary(L"d3d11") );
+    wil::unique_hmodule d3dModule( LoadLibraryA_DXHR("d3d11") );
     if ( d3dModule.is_valid() )
     {
         PFN_D3D11_CREATE_DEVICE createFn = reinterpret_cast<PFN_D3D11_CREATE_DEVICE>(GetProcAddress( d3dModule.get(), "D3D11CreateDevice" ));

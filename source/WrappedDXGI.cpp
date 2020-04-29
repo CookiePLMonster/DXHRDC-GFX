@@ -52,12 +52,14 @@ LRESULT WINAPI UIWndProc(HWND hWnd, UINT msg, WPARAM wParam, LPARAM lParam)
 
 }
 
+extern HMODULE WINAPI LoadLibraryA_DXHR( LPCSTR lpLibFileName );
+
 HRESULT WINAPI CreateDXGIFactory_Export( REFIID riid, void** ppFactory )
 {
     *ppFactory = nullptr;
 
     // Try to load a real dxgi.dll, DXGIFactory will claim ownership of its reference if created successfully
-    wil::unique_hmodule dxgiModule( LoadLibrary(L"dxgi") );
+    wil::unique_hmodule dxgiModule( LoadLibraryA_DXHR("dxgi") );
     if ( dxgiModule.is_valid() )
     {
         auto factoryFn = reinterpret_cast<decltype(CreateDXGIFactory)*>(GetProcAddress( dxgiModule.get(), "CreateDXGIFactory" ));
