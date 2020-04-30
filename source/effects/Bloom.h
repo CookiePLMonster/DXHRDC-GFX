@@ -27,8 +27,7 @@ public:
 
 	// Machine state functions
 	ComPtr<ID3D11PixelShader> BeforePixelShaderSet( ID3D11DeviceContext* context, ID3D11PixelShader* shader );
-	void BeforeDraw( ID3D11DeviceContext* context );
-	void AfterDraw( ID3D11DeviceContext* context );
+	bool OnDraw( ID3D11DeviceContext* context, UINT VertexCount, UINT StartVertexLocation );
 
 private:
 	enum class State

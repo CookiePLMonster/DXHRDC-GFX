@@ -88,7 +88,10 @@ bool Effects::Lighting::OnDrawIndexed(ID3D11DeviceContext* context, UINT IndexCo
 			context->PSSetShaderResources( 0, _countof(resources), resources );
 			for ( auto* r : resources )
 			{
-				r->Release();
+				if ( r != nullptr )
+				{
+					r->Release();
+				}
 			}
 		});
 

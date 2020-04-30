@@ -410,9 +410,10 @@ void STDMETHODCALLTYPE D3D11DeviceContext::DrawIndexed(UINT IndexCount, UINT Sta
 void STDMETHODCALLTYPE D3D11DeviceContext::Draw(UINT VertexCount, UINT StartVertexLocation)
 {
     m_device->GetColorGrading().BeforeDraw(this, VertexCount, StartVertexLocation);
-    m_device->GetBloom().BeforeDraw(this);
-    m_orig->Draw(VertexCount, StartVertexLocation);
-    m_device->GetBloom().AfterDraw(this);
+    if ( !m_device->GetBloom().OnDraw(m_orig.Get(), VertexCount, StartVertexLocation) )
+    {
+        m_orig->Draw(VertexCount, StartVertexLocation);
+    }
 }
 
 HRESULT STDMETHODCALLTYPE D3D11DeviceContext::Map(ID3D11Resource* pResource, UINT Subresource, D3D11_MAP MapType, UINT MapFlags, D3D11_MAPPED_SUBRESOURCE* pMappedResource)

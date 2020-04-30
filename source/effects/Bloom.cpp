@@ -2,6 +2,8 @@
 
 #include <cstdint>
 
+#include "../wil/resource.h"
+
 #include "Bloom_shader.h"
 
 void Effects::Bloom::CreateAlternatePixelShader( ID3D11PixelShader* shader, const void* bytecode, SIZE_T length )
@@ -149,7 +151,7 @@ ComPtr<ID3D11PixelShader> Effects::Bloom::BeforePixelShaderSet( ID3D11DeviceCont
 	return result;
 }
 
-void Effects::Bloom::BeforeDraw( ID3D11DeviceContext* context )
+bool Effects::Bloom::OnDraw( ID3D11DeviceContext* context, UINT VertexCount, UINT StartVertexLocation )
 {
 	if ( m_state == State::Bloom2Drawn )
 	{
@@ -163,29 +165,52 @@ void Effects::Bloom::BeforeDraw( ID3D11DeviceContext* context )
 		m_state = State::Initial;
 
 		// Rebind inputs to match the modified shader
-		ID3D11ShaderResourceView* v[3];
-		context->PSGetShaderResources( 0, 3, v );
-		ComPtr<ID3D11ShaderResourceView> views[3];
-		views[0].Attach( v[0] );
-		views[1].Attach( v[1] );
-		views[2].Attach( v[2] );
+		ID3D11ShaderResourceView* view[3]; // Warning - raw pointers!
+		context->PSGetShaderResources( 0, 3, view );
+		auto releaseSRV = wil::scope_exit([&] {
+			for ( auto* r : view )
+			{
+				if ( r != nullptr )
+				{
+					r->Release();
+				}
+			}
+		});
 
 		// SRV2 goes to SRV0, SRV0 goes to SRV1
-		ID3D11ShaderResourceView* reboundSRV[] = { views[2].Get(), views[0].Get() };
-		context->PSSetShaderResources( 0, 2, reboundSRV );
+		ID3D11ShaderResourceView* const reboundSRV[] = { view[2], view[0] };
+		context->PSSetShaderResources( 0, _countof(reboundSRV), reboundSRV );
 
-		ComPtr<ID3D11Buffer> cb;
-		context->PSGetConstantBuffers( 5, 1, cb.GetAddressOf() );
+		ID3D11Buffer* cb[3]; // Warning - raw pointers!
+		context->PSGetConstantBuffers( 3, 3, cb );
+		auto releaseCB = wil::scope_exit([&] {
+			for ( auto* r : cb )
+			{
+				if ( r != nullptr )
+				{
+					r->Release();
+				}
+			}
+		});
 
 		// CB5 goes to CB3
-		context->PSSetConstantBuffers( 3, 1, cb.GetAddressOf() );
-	}
-}
+		context->PSSetConstantBuffers( 3, 1, &cb[2] );
 
-void Effects::Bloom::AfterDraw( ID3D11DeviceContext* /*context*/ )
-{
-	if ( m_state == State::Bloom2Set )
+		// Rebind the original resources after the draw
+		auto restore = wil::scope_exit([&] {
+			context->PSSetConstantBuffers( 3, 1, &cb[0] );
+
+			context->PSSetShaderResources( 0, _countof(view), view );
+		});
+
+		context->Draw( VertexCount, StartVertexLocation );
+		return true;
+	}
+	else if ( m_state == State::Bloom2Set )
 	{
 		m_state = State::Bloom2Drawn;
 	}
+
+	return false;
 }
+
