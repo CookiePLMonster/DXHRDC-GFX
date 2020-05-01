@@ -11,13 +11,25 @@ void Effects::ColorGrading::OnPixelShaderSet(ID3D11PixelShader* shader)
 {
 	if ( !SETTINGS.colorGradingEnabled ) return;
 
-	if ( GetPixelShaderAnnotation( shader ).m_type == ResourceMetadata::Type::BloomMergerShader )
+	const ResourceMetadata::Type shaderType = GetPixelShaderAnnotation( shader ).m_type;
+
+	if ( shaderType == ResourceMetadata::Type::BloomMergerShader )
 	{
 		m_state = State::MergerCallFound;
 		return;
 	}
 
-	if ( m_state == State::MergerCallFound ) m_state = State::Initial; // Reset in case the required shader was "found" but changed before it was used
+	if ( m_state == State::MergerCallFound )
+	{
+		m_state = State::Initial; // Reset in case the required shader was "found" but changed before it was used
+		return;
+	}
+
+	if ( m_state == State::ResourcesGathered )
+	{
+		// If setting to use Edge AA, ignore blend state changes
+		m_volatileData->m_edgeAADetected = shaderType == ResourceMetadata::Type::EdgeAA;
+	}
 }
 
 void Effects::ColorGrading::BeforeDraw( ID3D11DeviceContext* context, UINT VertexCount, UINT StartVertexLocation )
@@ -55,7 +67,7 @@ void Effects::ColorGrading::BeforeOMSetBlendState(ID3D11DeviceContext* context, 
 	if ( m_state == State::ResourcesGathered )
 	{
 		// If setting to a different blend state to what we saved, draw
-		if ( m_volatileData->m_blendState.Get() != pBlendState )
+		if ( !m_volatileData->m_edgeAADetected && m_volatileData->m_blendState.Get() != pBlendState )
 		{
 			// Draw to current RTV0
 			ComPtr<ID3D11RenderTargetView> curRTV;

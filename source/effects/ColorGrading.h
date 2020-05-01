@@ -68,6 +68,7 @@ private:
 	// Volatile data - references obtained and released every frame, used for draw detection
 	struct VolatileData
 	{
+		bool m_edgeAADetected = false;
 		ComPtr<ID3D11VertexShader> m_vertexShader;
 		ComPtr<ID3D11InputLayout> m_inputLayout;
 		ComPtr<ID3D11RasterizerState> m_rasterizerState;

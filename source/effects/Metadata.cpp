@@ -54,6 +54,9 @@ void Effects::AnnotatePixelShader( ID3D11PixelShader* shader, const void* byteco
 		{ { 0x65ae0cbf, 0x89721070, 0x6078754d, 0xa3a24d48 }, ResourceMetadata::Type::LightingShader2 },
 		{ { 0x2ede696f, 0x36c567e9, 0xaacac074, 0xb5f3ad15 }, ResourceMetadata::Type::LightingShader3 },
 		{ { 0x4ee86a1e, 0xbf1eba8f, 0x48e4cf30, 0x635dc3f9 }, ResourceMetadata::Type::LightingShader4 },
+
+		{ { 0x4e0ff42d, 0x6cc1abc1, 0x3b4ac407, 0xc70f5d7e }, ResourceMetadata::Type::EdgeAA },
+		{ { 0x0b4857ad, 0x5efeb1e9, 0x76a173d2, 0xfd56ff9f }, ResourceMetadata::Type::EdgeAA },
 	};
 
 	if ( length >= 4 + 16 )

@@ -23,6 +23,8 @@ struct __declspec(uuid("5383C3EB-9DE8-48FC-8C88-8721759EA8E6")) ResourceMetadata
 		LightingShader2,
 		LightingShader3,
 		LightingShader4,
+
+		EdgeAA, // More than one shader, but we don't need to differentiate them
 	};
 
 	Type m_type;
