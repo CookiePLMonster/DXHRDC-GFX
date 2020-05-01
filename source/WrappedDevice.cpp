@@ -901,6 +901,7 @@ void STDMETHODCALLTYPE D3D11DeviceContext::CSGetConstantBuffers(UINT StartSlot, 
 
 void STDMETHODCALLTYPE D3D11DeviceContext::ClearState(void)
 {
+    m_device->GetColorGrading().ClearState();
     m_orig->ClearState();
 }
 

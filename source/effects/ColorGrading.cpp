@@ -7,6 +7,20 @@
 
 #include "ColorGrading_shader.h"
 
+Effects::ColorGrading::ColorGrading(ID3D11Device* device)
+	: m_device(device)
+{
+	m_device->CreatePixelShader( COLOR_GRADING_PS_BYTECODE, sizeof(COLOR_GRADING_PS_BYTECODE), nullptr, m_pixelShader.GetAddressOf() );
+
+	D3D11_BUFFER_DESC cbDesc {};
+	cbDesc.ByteWidth = 512;
+	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
+	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
+	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
+
+	m_device->CreateBuffer( &cbDesc, nullptr, m_constantBuffer.GetAddressOf() );
+}
+
 void Effects::ColorGrading::OnPixelShaderSet(ID3D11PixelShader* shader)
 {
 	if ( !SETTINGS.colorGradingEnabled ) return;
@@ -57,7 +71,7 @@ void Effects::ColorGrading::BeforeDraw( ID3D11DeviceContext* context, UINT Verte
 
 		if ( !m_persistentData.has_value() )
 		{
-			CreatePersistentData();
+			m_persistentData = std::make_optional<PersistentData>();
 		}
 	}
 }
@@ -119,6 +133,13 @@ void Effects::ColorGrading::BeforeOMSetRenderTargets(ID3D11DeviceContext* contex
 	}
 }
 
+void Effects::ColorGrading::ClearState()
+{
+	m_persistentData.reset();
+	m_volatileData.reset();
+	m_state = State::Initial;
+}
+
 void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const ComPtr<ID3D11Resource>& target)
 {
 	m_state = State::Initial;
@@ -176,7 +197,7 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 	});
 
 	context->VSSetShader( m_volatileData->m_vertexShader.Get(), nullptr, 0 );
-	context->PSSetShader( m_persistentData->m_pixelShader.Get(), nullptr, 0 );
+	context->PSSetShader( m_pixelShader.Get(), nullptr, 0 );
 	context->IASetInputLayout( m_volatileData->m_inputLayout.Get() );
 	context->RSSetState( m_volatileData->m_rasterizerState.Get() );
 
@@ -184,13 +205,13 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 
 	context->IASetVertexBuffers( 0, 1, std::get<0>(m_volatileData->m_vertexBuffer).GetAddressOf(),
 			&std::get<1>(m_volatileData->m_vertexBuffer), &std::get<2>(m_volatileData->m_vertexBuffer) );
-	context->PSSetConstantBuffers( 5, 1, m_persistentData->m_constantBuffer.GetAddressOf() );
+	context->PSSetConstantBuffers( 5, 1, m_constantBuffer.GetAddressOf() );
 	context->PSSetShaderResources( 0, 1, m_persistentData->m_lastOutputSRV.GetAddressOf() );
 
 	if ( std::exchange(SETTINGS.colorGradingDirty, false) )
 	{
 		ComPtr<ID3D11Resource> cbResource;
-		m_persistentData->m_constantBuffer.As(&cbResource);
+		m_constantBuffer.As(&cbResource);
 
 		D3D11_MAPPED_SUBRESOURCE mapped;
 		if ( SUCCEEDED(context->Map( cbResource.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped )) )
@@ -206,17 +227,3 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 	m_volatileData.reset();
 }
 
-void Effects::ColorGrading::CreatePersistentData()
-{
-	m_persistentData = std::make_optional<PersistentData>();
-
-	m_device->CreatePixelShader( COLOR_GRADING_PS_BYTECODE, sizeof(COLOR_GRADING_PS_BYTECODE), nullptr, m_persistentData->m_pixelShader.GetAddressOf() );
-
-	D3D11_BUFFER_DESC cbDesc {};
-	cbDesc.ByteWidth = 512;
-	cbDesc.Usage = D3D11_USAGE_DYNAMIC;
-	cbDesc.BindFlags = D3D11_BIND_CONSTANT_BUFFER;
-	cbDesc.CPUAccessFlags = D3D11_CPU_ACCESS_WRITE;
-
-	m_device->CreateBuffer( &cbDesc, nullptr, m_persistentData->m_constantBuffer.GetAddressOf() );
-}

@@ -25,20 +25,17 @@ namespace Effects
 class ColorGrading
 {
 public:
-	ColorGrading( ID3D11Device* device )
-		: m_device( device )
-	{
-	}
+	ColorGrading(ID3D11Device* device);
 
 	// Machine state functions
 	void OnPixelShaderSet( ID3D11PixelShader* shader );
 	void BeforeDraw( ID3D11DeviceContext* context, UINT VertexCount, UINT StartVertexLocation );
 	void BeforeOMSetBlendState( ID3D11DeviceContext* context, ID3D11BlendState* pBlendState );
 	void BeforeOMSetRenderTargets( ID3D11DeviceContext* context, UINT NumViews, ID3D11RenderTargetView* const* ppRenderTargetViews, ID3D11DepthStencilView* pDepthStencilView );
+	void ClearState();
 
 private:
 	void DrawColorFilter( ID3D11DeviceContext* context, const ComPtr<ID3D11Resource>& target );
-	void CreatePersistentData();
 
 	enum class State
 	{
@@ -50,11 +47,12 @@ private:
 	State m_state = State::Initial;
 	ID3D11Device* m_device; // Effect cannot outlive the device
 
+	ComPtr<ID3D11PixelShader> m_pixelShader;
+	ComPtr<ID3D11Buffer> m_constantBuffer;
+
 	// Persistent data - created on demand and invalidated only on resolution/settings change
 	struct PersistentData
 	{
-		ComPtr<ID3D11PixelShader> m_pixelShader;
-		ComPtr<ID3D11Buffer> m_constantBuffer;
 
 		// Flushed if RTV doesn't match the current output
 		ComPtr<ID3D11Resource> m_lastOutputRT;
