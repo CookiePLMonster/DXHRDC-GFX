@@ -30,8 +30,6 @@ public:
 	{
 	}
 
-	void AnnotatePixelShader( ID3D11PixelShader* shader, const void* bytecode, SIZE_T length );
-
 	// Machine state functions
 	void OnPixelShaderSet( ID3D11PixelShader* shader );
 	void BeforeDraw( ID3D11DeviceContext* context, UINT VertexCount, UINT StartVertexLocation );

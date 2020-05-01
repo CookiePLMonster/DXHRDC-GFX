@@ -138,9 +138,10 @@ HRESULT STDMETHODCALLTYPE D3D11Device::CreatePixelShader(const void* pShaderByte
     HRESULT hr = m_orig->CreatePixelShader(pShaderBytecode, BytecodeLength, pClassLinkage, ppPixelShader);
     if ( SUCCEEDED(hr) )
     {
-        m_colorGrading.AnnotatePixelShader( *ppPixelShader, pShaderBytecode, BytecodeLength );
-        m_bloom.CreateAlternatePixelShader( *ppPixelShader, pShaderBytecode, BytecodeLength );
-        m_lighting.CreateAlternatePixelShader( *ppPixelShader, pShaderBytecode, BytecodeLength );
+        Effects::AnnotatePixelShader( *ppPixelShader, pShaderBytecode, BytecodeLength );
+
+        m_bloom.CreateAlternatePixelShader( *ppPixelShader );
+        m_lighting.CreateAlternatePixelShader( *ppPixelShader );
     }
     return hr;
 }

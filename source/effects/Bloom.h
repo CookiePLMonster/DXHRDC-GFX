@@ -23,7 +23,7 @@ public:
 	{
 	}
 
-	void CreateAlternatePixelShader( ID3D11PixelShader* shader, const void* bytecode, SIZE_T length );
+	void CreateAlternatePixelShader( ID3D11PixelShader* shader );
 
 	// Machine state functions
 	ComPtr<ID3D11PixelShader> BeforePixelShaderSet( ID3D11DeviceContext* context, ID3D11PixelShader* shader );

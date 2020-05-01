@@ -7,35 +7,14 @@
 
 #include "ColorGrading_shader.h"
 
-void Effects::ColorGrading::AnnotatePixelShader(ID3D11PixelShader* shader, const void* bytecode, SIZE_T length)
-{
-	// TODO: Factorize when we need more resources annotated
-	static constexpr uint32_t BLOOM_MERGER_SHADER_HASH[4] = { 0xf3896ba8, 0x4f0671da, 0xa690e62a, 0xc9168288 };
-
-	if ( length >= 4 + sizeof(BLOOM_MERGER_SHADER_HASH) )
-	{
-		if ( memcmp( reinterpret_cast<const uint8_t*>(bytecode) + 4, BLOOM_MERGER_SHADER_HASH, sizeof(BLOOM_MERGER_SHADER_HASH) ) == 0 )
-		{
-			ResourceMetadata resource;
-			resource.m_type = ResourceMetadata::Type::BloomMergerShader;
-			shader->SetPrivateData( __uuidof(resource), sizeof(resource), &resource );
-		}
-	}
-}
-
 void Effects::ColorGrading::OnPixelShaderSet(ID3D11PixelShader* shader)
 {
 	if ( !SETTINGS.colorGradingEnabled ) return;
 
-	ResourceMetadata meta;
-	UINT size = sizeof(meta);
-	if ( SUCCEEDED(shader->GetPrivateData(__uuidof(meta), &size, &meta)) )
+	if ( GetPixelShaderAnnotation( shader ).m_type == ResourceMetadata::Type::BloomMergerShader )
 	{
-		if ( meta.m_type == ResourceMetadata::Type::BloomMergerShader )
-		{
-			m_state = State::MergerCallFound;
-			return;
-		}
+		m_state = State::MergerCallFound;
+		return;
 	}
 
 	if ( m_state == State::MergerCallFound ) m_state = State::Initial; // Reset in case the required shader was "found" but changed before it was used

@@ -1,6 +1,7 @@
 #pragma once
 
 #include <type_traits>
+#include <d3d11.h>
 
 namespace Effects 
 {
@@ -11,6 +12,8 @@ struct __declspec(uuid("5383C3EB-9DE8-48FC-8C88-8721759EA8E6")) ResourceMetadata
 	// Found by hashing
 	enum class Type
 	{
+		None,
+
 		BloomMergerShader,
 		BloomShader1, // Different in DXHR
 		BloomShader2, // Same in DXHR, but holds an additional "BloomShader3" as an additional resource
@@ -25,6 +28,11 @@ struct __declspec(uuid("5383C3EB-9DE8-48FC-8C88-8721759EA8E6")) ResourceMetadata
 	Type m_type;
 };
 static_assert(std::is_trivial_v<ResourceMetadata>); // Private data is memcpy'd around and destructed by freeing memory only
+
+// Shader annotator
+void AnnotatePixelShader( ID3D11PixelShader* shader, ResourceMetadata::Type type, bool replacement );
+void AnnotatePixelShader( ID3D11PixelShader* shader, const void* bytecode, SIZE_T length );
+ResourceMetadata GetPixelShaderAnnotation( ID3D11PixelShader* shader );
 
 // {2BBE62D5-AB9D-47B1-AED2-F40C375BDD0F}
 static const GUID GUID_AlternateResource = 

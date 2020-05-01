@@ -2,6 +2,9 @@
 #include "Metadata.h"
 
 #include <stdio.h>
+#include <cstdint>
+#include <utility>
+#include <array>
 
 extern wchar_t wcModulePath[MAX_PATH];
 
@@ -31,6 +34,53 @@ const float Effects::COLOR_GRADING_PRESETS[3][4][4] = {
 };
 
 const float Effects::VIGNETTE_PRESET[4] = { 1.0f,  0.0f,  0.7f,  0.7f };
+
+void Effects::AnnotatePixelShader( ID3D11PixelShader* shader, ResourceMetadata::Type type, bool /*replacement*/ )
+{
+	ResourceMetadata resource;
+	resource.m_type = type;
+	shader->SetPrivateData( __uuidof(resource), sizeof(resource), &resource );
+}
+
+void Effects::AnnotatePixelShader( ID3D11PixelShader* shader, const void* bytecode, SIZE_T length )
+{
+	static constexpr std::pair< std::array<uint32_t, 4>, ResourceMetadata::Type > importantShaders[] = {
+		{ { 0xf3896ba8, 0x4f0671da, 0xa690e62a, 0xc9168288 }, ResourceMetadata::Type::BloomMergerShader },
+		{ { 0x1e94a642, 0x771834d4, 0xf7c2a424, 0x583be5c8 }, ResourceMetadata::Type::BloomShader1 },
+		{ { 0xaf000e64, 0x2766c2fc, 0xe3aa8a2c, 0x2f0ee3af }, ResourceMetadata::Type::BloomShader2 },
+		{ { 0x32976b21, 0x3bec6292, 0x89f5d21c, 0xed6bd65f }, ResourceMetadata::Type::BloomShader4 },
+
+		{ { 0x4abe618c, 0xa282fa5b, 0xdcde9b8b, 0xaf4aa8fb }, ResourceMetadata::Type::LightingShader1 },
+		{ { 0x65ae0cbf, 0x89721070, 0x6078754d, 0xa3a24d48 }, ResourceMetadata::Type::LightingShader2 },
+		{ { 0x2ede696f, 0x36c567e9, 0xaacac074, 0xb5f3ad15 }, ResourceMetadata::Type::LightingShader3 },
+		{ { 0x4ee86a1e, 0xbf1eba8f, 0x48e4cf30, 0x635dc3f9 }, ResourceMetadata::Type::LightingShader4 },
+	};
+
+	if ( length >= 4 + 16 )
+	{
+		const uint32_t* hash = reinterpret_cast<const uint32_t*>(reinterpret_cast<const uint8_t*>(bytecode) + 4);
+		for ( const auto& sh : importantShaders )
+		{
+			if ( std::equal( sh.first.begin(), sh.first.end(), hash ) )
+			{
+				AnnotatePixelShader( shader, sh.second, false );
+				return;
+			}
+
+		}
+	}
+}
+
+auto Effects::GetPixelShaderAnnotation(ID3D11PixelShader* shader) -> ResourceMetadata
+{
+	ResourceMetadata result;
+	UINT size = sizeof(result);
+	if ( FAILED(shader->GetPrivateData(__uuidof(result), &size, &result)) )
+	{
+		result.m_type = ResourceMetadata::Type::None;
+	}
+	return result;
+}
 
 int Effects::GetSelectedPreset( float attribs[4][4] )
 {
