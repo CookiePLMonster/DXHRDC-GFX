@@ -210,14 +210,11 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 
 	if ( std::exchange(SETTINGS.colorGradingDirty, false) )
 	{
-		ComPtr<ID3D11Resource> cbResource;
-		m_constantBuffer.As(&cbResource);
-
 		D3D11_MAPPED_SUBRESOURCE mapped;
-		if ( SUCCEEDED(context->Map( cbResource.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped )) )
+		if ( SUCCEEDED(context->Map( m_constantBuffer.Get(), 0, D3D11_MAP_WRITE_DISCARD, 0, &mapped )) )
 		{
 			memcpy( mapped.pData, SETTINGS.colorGradingAttributes, sizeof(SETTINGS.colorGradingAttributes) );
-			context->Unmap( cbResource.Get(), 0 );
+			context->Unmap( m_constantBuffer.Get(), 0 );
 		}
 	}
 
