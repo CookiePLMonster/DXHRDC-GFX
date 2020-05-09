@@ -601,7 +601,8 @@ void STDMETHODCALLTYPE D3D11DeviceContext::CopyStructureCount(ID3D11Buffer* pDst
 
 void STDMETHODCALLTYPE D3D11DeviceContext::ClearRenderTargetView(ID3D11RenderTargetView* pRenderTargetView, const FLOAT ColorRGBA[4])
 {
-	m_orig->ClearRenderTargetView(pRenderTargetView, ColorRGBA);
+    m_device->GetColorGrading().BeforeClearRenderTargetView( this, pRenderTargetView, ColorRGBA );
+    m_orig->ClearRenderTargetView(pRenderTargetView, ColorRGBA);
 }
 
 void STDMETHODCALLTYPE D3D11DeviceContext::ClearUnorderedAccessViewUint(ID3D11UnorderedAccessView* pUnorderedAccessView, const UINT Values[4])

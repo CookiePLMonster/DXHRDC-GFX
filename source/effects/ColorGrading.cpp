@@ -155,6 +155,33 @@ void Effects::ColorGrading::BeforeOMSetRenderTargets(ID3D11DeviceContext* contex
 	}
 }
 
+void Effects::ColorGrading::BeforeClearRenderTargetView(ID3D11DeviceContext* context, ID3D11RenderTargetView* /*pRenderTargetView*/, const FLOAT /*ColorRGBA*/[4])
+{
+	if ( m_state == State::ResourcesGathered )
+	{
+		// If we got there before the other code paths, subtitles are disabled and we'd end up drawing the filter too late otherwise
+#if DEBUG_COLOR_GRADING_CALLS
+		ComPtr<ID3DUserDefinedAnnotation> annotation;
+		if (SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(annotation.GetAddressOf()))))
+		{
+			annotation->SetMarker( L"BeforeClearRenderTargetView" );
+		}
+#endif
+
+		// Need to restore RTV/DSV afterwards in this case
+		ComPtr<ID3D11RenderTargetView> curRTV;
+		ComPtr<ID3D11DepthStencilView> curDSV;
+		context->OMGetRenderTargets( 1, curRTV.GetAddressOf(), curDSV.GetAddressOf() );
+		auto restoreRTV = wil::scope_exit([&] {
+			context->OMSetRenderTargets( 1, curRTV.GetAddressOf(), curDSV.Get() );
+		});
+
+		ComPtr<ID3D11Resource> curRT;
+		m_volatileData->m_lastUnboundRTV->GetResource( curRT.GetAddressOf() );
+		DrawColorFilter( context, curRT );
+	}
+}
+
 void Effects::ColorGrading::ClearState()
 {
 	m_persistentData.reset();

@@ -32,6 +32,7 @@ public:
 	void BeforeDraw( ID3D11DeviceContext* context, UINT VertexCount, UINT StartVertexLocation );
 	void BeforeOMSetBlendState( ID3D11DeviceContext* context, ID3D11BlendState* pBlendState );
 	void BeforeOMSetRenderTargets( ID3D11DeviceContext* context, UINT NumViews, ID3D11RenderTargetView* const* ppRenderTargetViews, ID3D11DepthStencilView* pDepthStencilView );
+	void BeforeClearRenderTargetView( ID3D11DeviceContext* context, ID3D11RenderTargetView* pRenderTargetView, const FLOAT ColorRGBA[4] );
 	void ClearState();
 
 private:
