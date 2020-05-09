@@ -7,6 +7,12 @@
 
 #include "ColorGrading_shader.h"
 
+#define DEBUG_COLOR_GRADING_CALLS 0
+
+#if DEBUG_COLOR_GRADING_CALLS
+#include <d3d11_1.h>
+#endif
+
 Effects::ColorGrading::ColorGrading(ID3D11Device* device)
 	: m_device(device)
 {
@@ -91,6 +97,14 @@ void Effects::ColorGrading::BeforeOMSetBlendState(ID3D11DeviceContext* context, 
 				context->OMSetRenderTargets( 1, curRTV.GetAddressOf(), curDSV.Get() );
 			});
 
+#if DEBUG_COLOR_GRADING_CALLS
+			ComPtr<ID3DUserDefinedAnnotation> annotation;
+			if (SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(annotation.GetAddressOf()))))
+			{
+				annotation->SetMarker( L"BeforeOMSetBlendState" );
+			}
+#endif
+
 			ComPtr<ID3D11Resource> curRT;
 			curRTV->GetResource( curRT.GetAddressOf() );
 			DrawColorFilter( context, curRT );
@@ -125,6 +139,14 @@ void Effects::ColorGrading::BeforeOMSetRenderTargets(ID3D11DeviceContext* contex
 			{
 				// Draw to "last" RTV0
 				// No need to save/restore render targets as they will be overwritten
+#if DEBUG_COLOR_GRADING_CALLS
+				ComPtr<ID3DUserDefinedAnnotation> annotation;
+				if (SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(annotation.GetAddressOf()))))
+				{
+					annotation->SetMarker( L"BeforeOMSetRenderTargets" );
+				}
+#endif
+
 				m_volatileData->m_lastUnboundRTV->GetResource( curRT.ReleaseAndGetAddressOf() );
 				DrawColorFilter( context, curRT );
 			}
@@ -195,6 +217,22 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 		context->PSSetShader( savedPixelShader.Get(), nullptr, 0 );
 		context->VSSetShader( savedVertexShader.Get(), nullptr, 0 );		
 	});
+
+#if DEBUG_COLOR_GRADING_CALLS
+	ComPtr<ID3DUserDefinedAnnotation> annotation;
+	auto endEvent = wil::scope_exit([&] {
+		if (annotation)
+		{
+			annotation->EndEvent();
+		}
+	});
+
+
+	if (SUCCEEDED(context->QueryInterface(IID_PPV_ARGS(annotation.GetAddressOf()))))
+	{
+		annotation->BeginEvent( L"DrawColorFilter" );
+	}
+#endif
 
 	context->VSSetShader( m_volatileData->m_vertexShader.Get(), nullptr, 0 );
 	context->PSSetShader( m_pixelShader.Get(), nullptr, 0 );
