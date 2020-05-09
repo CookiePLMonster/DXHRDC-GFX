@@ -13,6 +13,17 @@
 #include <d3d11_1.h>
 #endif
 
+static D3D11_TEXTURE2D_DESC GetTextureResourceDesc(const ComPtr<ID3D11Resource>& resource)
+{
+	D3D11_TEXTURE2D_DESC desc;
+
+	ComPtr<ID3D11Texture2D> curTexture;
+	resource.As(&curTexture);
+
+	curTexture->GetDesc( &desc );
+	return desc;
+}
+
 Effects::ColorGrading::ColorGrading(ID3D11Device* device)
 	: m_device(device)
 {
@@ -105,9 +116,7 @@ void Effects::ColorGrading::BeforeOMSetBlendState(ID3D11DeviceContext* context, 
 			}
 #endif
 
-			ComPtr<ID3D11Resource> curRT;
-			curRTV->GetResource( curRT.GetAddressOf() );
-			DrawColorFilter( context, curRT );
+			DrawColorFilter( context, curRTV );
 		}
 	}
 }
@@ -129,11 +138,7 @@ void Effects::ColorGrading::BeforeOMSetRenderTargets(ID3D11DeviceContext* contex
 			ComPtr<ID3D11Resource> curRT;
 			ppRenderTargetViews[0]->GetResource( curRT.GetAddressOf() );
 
-			ComPtr<ID3D11Texture2D> curTexture;
-			curRT.As(&curTexture);
-
-			D3D11_TEXTURE2D_DESC desc;
-			curTexture->GetDesc( &desc );
+			const D3D11_TEXTURE2D_DESC desc = GetTextureResourceDesc( curRT );
 
 			if ( desc.Width < std::get<1>(m_persistentData->m_tempRT) && desc.Height < std::get<2>(m_persistentData->m_tempRT) )
 			{
@@ -147,8 +152,7 @@ void Effects::ColorGrading::BeforeOMSetRenderTargets(ID3D11DeviceContext* contex
 				}
 #endif
 
-				m_volatileData->m_lastUnboundRTV->GetResource( curRT.ReleaseAndGetAddressOf() );
-				DrawColorFilter( context, curRT );
+				DrawColorFilter( context, m_volatileData->m_lastUnboundRTV );
 			}
 			return;
 		}
@@ -176,9 +180,7 @@ void Effects::ColorGrading::BeforeClearRenderTargetView(ID3D11DeviceContext* con
 			context->OMSetRenderTargets( 1, curRTV.GetAddressOf(), curDSV.Get() );
 		});
 
-		ComPtr<ID3D11Resource> curRT;
-		m_volatileData->m_lastUnboundRTV->GetResource( curRT.GetAddressOf() );
-		DrawColorFilter( context, curRT );
+		DrawColorFilter( context, m_volatileData->m_lastUnboundRTV );
 	}
 }
 
@@ -189,15 +191,14 @@ void Effects::ColorGrading::ClearState()
 	m_state = State::Initial;
 }
 
-void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const ComPtr<ID3D11Resource>& target)
+void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const ComPtr<ID3D11RenderTargetView>& target)
 {
 	m_state = State::Initial;
 
-	ComPtr<ID3D11Texture2D> curTexture;
-	target.As(&curTexture);
+	ComPtr<ID3D11Resource> targetResource;
+	target->GetResource(targetResource.GetAddressOf());
 
-	D3D11_TEXTURE2D_DESC desc;
-	curTexture->GetDesc( &desc );
+	const D3D11_TEXTURE2D_DESC desc = GetTextureResourceDesc( targetResource );
 
 	// Recreate the temporary RT if dimensions don't match
 	if ( std::get<1>(m_persistentData->m_tempRT) != desc.Width || std::get<2>(m_persistentData->m_tempRT) != desc.Height )
@@ -211,10 +212,10 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 
 	// Recreate the SRV if cached RT doesn't match
 	// It should be cheap to recreate so such low effort caching should be enough
-	if ( m_persistentData->m_lastOutputRT == nullptr || m_persistentData->m_lastOutputRT != target )
+	if ( m_persistentData->m_lastOutputRT == nullptr || m_persistentData->m_lastOutputRT != targetResource )
 	{
-		m_persistentData->m_lastOutputRT = target;
-		m_device->CreateShaderResourceView( target.Get(), nullptr, m_persistentData->m_lastOutputSRV.ReleaseAndGetAddressOf() );
+		m_persistentData->m_lastOutputRT = targetResource;
+		m_device->CreateShaderResourceView( targetResource.Get(), nullptr, m_persistentData->m_lastOutputSRV.ReleaseAndGetAddressOf() );
 	}
 
 
@@ -284,7 +285,7 @@ void Effects::ColorGrading::DrawColorFilter(ID3D11DeviceContext* context, const 
 	}
 
 	context->Draw( 6, std::get<3>(m_volatileData->m_vertexBuffer) );
-	context->CopyResource( target.Get(), std::get<0>(m_persistentData->m_tempRT).Get() );
+	context->CopyResource( targetResource.Get(), std::get<0>(m_persistentData->m_tempRT).Get() );
 
 	m_volatileData.reset();
 }

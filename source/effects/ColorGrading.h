@@ -36,7 +36,7 @@ public:
 	void ClearState();
 
 private:
-	void DrawColorFilter( ID3D11DeviceContext* context, const ComPtr<ID3D11Resource>& target );
+	void DrawColorFilter( ID3D11DeviceContext* context, const ComPtr<ID3D11RenderTargetView>& target );
 
 	enum class State
 	{
