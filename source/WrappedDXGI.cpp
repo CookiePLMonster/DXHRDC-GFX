@@ -402,7 +402,6 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::Present(UINT SyncInterval, UINT Flags)
                         ImGui::SameLine();
                     }
                     ImGui::NewLine();
-                    ImGui::RadioButton( "Custom", curPreset == -1 );
 
                     if ( ImGui::CollapsingHeader( "Advanced settings" ) )
                     {
