@@ -25,8 +25,8 @@ workspace "*"
 	-- Disable exceptions in WIL
 	defines { "WIL_SUPPRESS_EXCEPTIONS" }
 
-	-- Disable linking XInput in Dear ImGui
-	defines { "IMGUI_IMPL_WIN32_DISABLE_GAMEPAD" }
+	-- Disable linking XInput in Dear ImGui and IME functions
+	defines { "IMGUI_IMPL_WIN32_DISABLE_GAMEPAD", "IMGUI_DISABLE_WIN32_DEFAULT_IME_FUNCTIONS" }
 
 	cppdialect "C++17"
 	staticruntime "on"
