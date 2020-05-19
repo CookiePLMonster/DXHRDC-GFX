@@ -40,7 +40,7 @@ private:
     ComPtr<IDXGIFactory> m_orig;
 };
 
-class DXGISwapChain final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<IDXGISwapChain, IDXGIDeviceSubObject, IDXGIObject> >
+class DXGISwapChain final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<IDXGISwapChain, IDXGIDeviceSubObject, IDXGIObject>, IWrapperObject >
 {
 public:
 	DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactory> factory, ComPtr<IUnknown> device, const DXGI_SWAP_CHAIN_DESC* desc);
@@ -64,6 +64,9 @@ public:
 	virtual HRESULT STDMETHODCALLTYPE GetContainingOutput(IDXGIOutput** ppOutput) override;
 	virtual HRESULT STDMETHODCALLTYPE GetFrameStatistics(DXGI_FRAME_STATISTICS* pStats) override;
 	virtual HRESULT STDMETHODCALLTYPE GetLastPresentCount(UINT* pLastPresentCount) override;
+
+	// IWrapperObject
+	virtual HRESULT STDMETHODCALLTYPE GetUnderlyingInterface(REFIID riid, void** ppvObject) override;
 
 private:
 	ComPtr<DXGIFactory> m_factory;

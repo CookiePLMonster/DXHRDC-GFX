@@ -529,3 +529,8 @@ HRESULT STDMETHODCALLTYPE DXGISwapChain::GetLastPresentCount(UINT* pLastPresentC
 {
 	return m_orig->GetLastPresentCount(pLastPresentCount);
 }
+
+HRESULT STDMETHODCALLTYPE DXGISwapChain::GetUnderlyingInterface(REFIID riid, void** ppvObject)
+{
+    return m_orig.CopyTo(riid, ppvObject);
+}

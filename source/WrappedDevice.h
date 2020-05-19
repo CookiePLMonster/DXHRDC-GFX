@@ -107,7 +107,7 @@ private:
     Effects::Lighting m_lighting;
 };
 
-class D3D11DeviceContext final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<ID3D11DeviceContext, ID3D11DeviceChild> >
+class D3D11DeviceContext final : public RuntimeClass< RuntimeClassFlags<ClassicCom>, ChainInterfaces<ID3D11DeviceContext, ID3D11DeviceChild>, IWrapperObject >
 {
 public:
     D3D11DeviceContext(ComPtr<ID3D11DeviceContext> context, ComPtr<D3D11Device> device);
@@ -226,6 +226,9 @@ public:
     virtual D3D11_DEVICE_CONTEXT_TYPE STDMETHODCALLTYPE GetType(void) override;
     virtual UINT STDMETHODCALLTYPE GetContextFlags(void) override;
     virtual HRESULT STDMETHODCALLTYPE FinishCommandList(BOOL RestoreDeferredContextState, ID3D11CommandList** ppCommandList) override;
+
+    // IWrapperObject
+    virtual HRESULT STDMETHODCALLTYPE GetUnderlyingInterface(REFIID riid, void** ppvObject) override;
 
 private:
     ComPtr<D3D11Device> m_device;

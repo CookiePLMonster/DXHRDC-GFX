@@ -925,3 +925,8 @@ HRESULT STDMETHODCALLTYPE D3D11DeviceContext::FinishCommandList(BOOL RestoreDefe
 {
     return m_orig->FinishCommandList(RestoreDeferredContextState, ppCommandList);
 }
+
+HRESULT STDMETHODCALLTYPE D3D11DeviceContext::GetUnderlyingInterface(REFIID riid, void** ppvObject)
+{
+    return m_orig.CopyTo(riid, ppvObject);
+}
