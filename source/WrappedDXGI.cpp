@@ -259,6 +259,7 @@ DXGISwapChain::DXGISwapChain(ComPtr<IDXGISwapChain> swapChain, ComPtr<DXGIFactor
 
         ImGuiIO& io = ImGui::GetIO();
         io.IniFilename = nullptr;
+        io.ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
 
         // Setup Dear ImGui style
         UI::SetUpImGuiStyle();
