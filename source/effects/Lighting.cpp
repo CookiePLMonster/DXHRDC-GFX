@@ -87,7 +87,7 @@ ComPtr<ID3D11PixelShader> Effects::Lighting::BeforePixelShaderSet(ID3D11DeviceCo
 	ComPtr<ID3D11PixelShader> result(shader);
 	m_swapSRVs = false;
 
-	if ( SETTINGS.lightingType == 0 ) return result;
+	if ( SETTINGS.lightingType == 0 || !shader ) return result;
 
 	ResourceMetadata meta;
 	UINT size = sizeof(meta);
