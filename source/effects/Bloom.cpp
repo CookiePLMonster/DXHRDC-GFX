@@ -80,7 +80,7 @@ ComPtr<ID3D11PixelShader> Effects::Bloom::BeforePixelShaderSet( ID3D11DeviceCont
 {
 	ComPtr<ID3D11PixelShader> result(shader);
 
-	if ( SETTINGS.bloomType == 0 ) return result;
+	if ( SETTINGS.bloomType == 0 || !shader ) return result;
 
 	m_state = State::Initial;
 	

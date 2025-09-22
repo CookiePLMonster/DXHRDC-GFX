@@ -40,7 +40,7 @@ Effects::ColorGrading::ColorGrading(ID3D11Device* device)
 
 void Effects::ColorGrading::OnPixelShaderSet(ID3D11PixelShader* shader)
 {
-	if ( !SETTINGS.colorGradingEnabled ) return;
+	if ( !SETTINGS.colorGradingEnabled || !shader ) return;
 
 	const ResourceMetadata::Type shaderType = GetPixelShaderAnnotation( shader ).m_type;
 
